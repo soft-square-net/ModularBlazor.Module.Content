@@ -12,7 +12,8 @@
 //
 // The platform's projects build from the ModularBlazor.Platform checkout next to this repo (Content.Playground.csproj).
 // It uses the same ports as the platform's Hybird lab (the client and identity are registered for them), so stop the
-// lab first. Data stays in the Docker volume "content-playground-data" and in playground/.data (the module catalog).
+// lab first. Data stays in the Docker volume "content-playground-data" and in playground/.data (the module catalogs,
+// host and client).
 
 using System.Reflection;
 
@@ -46,7 +47,12 @@ var identity = builder.AddProject<Projects.WebApi_Identity_Server>("identity", l
     .WithReference(identityDb, connectionName: "identity").WaitFor(identityDb)
     .WithHttpHealthCheck("/health");
 
-var catalog = Path.Combine(Metadata("PlaygroundData"), mode == "dev" ? "modules" : "modules-install");
+var data = Metadata("PlaygroundData");
+var catalog = Path.Combine(data, mode == "dev" ? "modules" : "modules-install");
+// The client-modules core module keeps its catalog (uploaded client modules) in a folder relative to the WebApi, i.e.
+// inside the platform checkout, shared with the platform's own lab. Keep the playground's in playground/.data instead
+// (a host override of the module's setting, Modules:Settings:{id}:{key}).
+var clientCatalog = Path.Combine(data, mode == "dev" ? "client-modules" : "client-modules-install");
 var webApi = builder.AddProject<Projects.WebApi>("webapi", launchProfileName: null)
     .WithHttpEndpoint(port: WebApiPort)
     .WithEnvironment("ASPNETCORE_ENVIRONMENT", "Development")
@@ -54,6 +60,7 @@ var webApi = builder.AddProject<Projects.WebApi>("webapi", launchProfileName: nu
     .WithEnvironment("Modules__Role", "Api")
     // Every module the platform ships plus this one; the catalog lives in this repo, not in the platform checkout.
     .WithEnvironment("Modules__Path", catalog)
+    .WithEnvironment("Modules__Settings__client-modules__ClientModules__Path", clientCatalog)
     .WithReference(tenantStore).WaitFor(tenantStore)
     .WithEnvironment("DatabaseServers__TenantStore__Provider", "PostgreSql")
     .WithReference(tenantData)

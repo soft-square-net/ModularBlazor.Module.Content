@@ -1,0 +1,147 @@
+@page "/contents/taxonomy"
+@inherits ContentPageBase
+
+@*
+  Presses and their categories (GET/POST /api/content/presses and /categories). Adding them needs content.manage.
+*@
+
+<PageTitle>Presses &amp; categories</PageTitle>
+
+<div class="mud-container ct-page">
+  <a href="contents" class="mud-button-root mud-button-text mud-button-primary mud-button-small ct-back">&larr; Contents Management</a>
+
+  <header class="ct-header">
+    <div>
+      <h1 class="mud-typography mud-typography-h4">Presses &amp; categories</h1>
+      <p class="mud-typography mud-typography-body1 ct-muted">
+        A press is a publication; every post belongs to one of its categories. Adding them needs the content.manage
+        permission.
+      </p>
+    </div>
+    <div class="ct-actions">
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
+    </div>
+  </header>
+
+  @if (Error is not null)
+  {
+    <p class="mud-typography mud-typography-body2 ct-error" role="alert">@Error</p>
+  }
+
+  <div class="ct-columns">
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">Presses</h2>
+      <form class="ct-inline-form" @onsubmit="AddPressAsync" @onsubmit:preventDefault>
+        <div class="mud-input-control ct-inline">
+          <label class="mud-input-label" for="ct-press-id">Id</label>
+          <div class="mud-input-wrapper"><input id="ct-press-id" class="mud-input-slot" @bind="_pressId" required pattern="[a-z0-9][a-z0-9-]*" placeholder="daily" /></div>
+        </div>
+        <div class="mud-input-control ct-inline ct-grow">
+          <label class="mud-input-label" for="ct-press-name">Name</label>
+          <div class="mud-input-wrapper"><input id="ct-press-name" class="mud-input-slot" @bind="_pressName" required placeholder="The Daily" /></div>
+        </div>
+        <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@Busy">Add press</button>
+      </form>
+      @if (_presses.Count == 0)
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">No presses yet.</p>
+      }
+      else
+      {
+        <ul class="ct-list">
+          @foreach (var press in _presses.OrderBy(p => p.Name))
+          {
+            <li><strong>@press.Name</strong> <span class="ct-muted">@press.Id · @_categories.Count(c => c.PressId == press.Id) categories</span></li>
+          }
+        </ul>
+      }
+    </section>
+
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">Categories</h2>
+      <form class="ct-inline-form" @onsubmit="AddCategoryAsync" @onsubmit:preventDefault>
+        <div class="mud-input-control ct-inline">
+          <label class="mud-input-label" for="ct-cat-press">Press</label>
+          <div class="mud-input-wrapper mud-input-wrapper--select">
+            <select id="ct-cat-press" class="mud-input-slot" @bind="_categoryPress" required>
+              <option value="">Choose…</option>
+              @foreach (var press in _presses.OrderBy(p => p.Name))
+              {
+                <option value="@press.Id">@press.Name</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div class="mud-input-control ct-inline">
+          <label class="mud-input-label" for="ct-cat-id">Id</label>
+          <div class="mud-input-wrapper"><input id="ct-cat-id" class="mud-input-slot" @bind="_categoryId" required pattern="[a-z0-9][a-z0-9-]*" placeholder="local" /></div>
+        </div>
+        <div class="mud-input-control ct-inline ct-grow">
+          <label class="mud-input-label" for="ct-cat-name">Name</label>
+          <div class="mud-input-wrapper"><input id="ct-cat-name" class="mud-input-slot" @bind="_categoryName" required placeholder="Local news" /></div>
+        </div>
+        <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || _presses.Count == 0)">Add category</button>
+      </form>
+      @if (_categories.Count == 0)
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">No categories yet.</p>
+      }
+      else
+      {
+        <ul class="ct-list">
+          @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.Name))
+          {
+            <li><strong>@category.Name</strong> <span class="ct-muted">@category.Id · @(_presses.FirstOrDefault(p => p.Id == category.PressId)?.Name ?? category.PressId)</span></li>
+          }
+        </ul>
+      }
+    </section>
+  </div>
+</div>
+
+@code {
+  private List<PressDto> _presses = [];
+  private List<CategoryDto> _categories = [];
+  private string? _pressId, _pressName, _categoryPress, _categoryId, _categoryName;
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (firstRender) await LoadAsync();
+  }
+
+  private async Task LoadAsync()
+  {
+    await RunAsync(async () =>
+    {
+      var client = Content;
+      _presses = (await client.ListPressesAsync()).ToList();
+      _categories = (await client.ListCategoriesAsync()).ToList();
+    });
+  }
+
+  private async Task AddPressAsync()
+  {
+    await RunAsync(async () =>
+    {
+      var press = await Content.AddPressAsync(new PressDto { Id = (_pressId ?? "").Trim(), Name = (_pressName ?? "").Trim() });
+      await MudTail.ToastAsync($"Press {press.Name} added.", "success");
+      _categoryPress ??= press.Id;
+      _pressId = _pressName = null;
+    }, then: LoadAsync);
+  }
+
+  private async Task AddCategoryAsync()
+  {
+    await RunAsync(async () =>
+    {
+      var category = await Content.AddCategoryAsync(new CategoryDto
+      {
+        Id = (_categoryId ?? "").Trim(),
+        PressId = _categoryPress ?? "",
+        Name = (_categoryName ?? "").Trim(),
+      });
+      await MudTail.ToastAsync($"Category {category.Name} added.", "success");
+      _categoryId = _categoryName = null;
+    }, then: LoadAsync);
+  }
+}
