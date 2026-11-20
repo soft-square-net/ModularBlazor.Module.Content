@@ -74,14 +74,29 @@ module in it. It builds the platform from source, from a
 
 | Profile | What it does | Use it for |
 | --- | --- | --- |
-| `dev` (default) | The WebApi loads the module straight from `src/WebApi.Modules.Content.Infrastructure/bin/<Configuration>/net10.0` (`Modules:Local`, Development only): installed and active on start | Daily work: change code, rebuild, restart the `webapi` resource in the dashboard (or F5 again) |
+| `dev` (default) | The WebApi loads the module straight from `src/WebApi.Modules.Content.Infrastructure/bin/<Configuration>/net10.0` (`Modules:Local`, Development only): installed and active on start, and the client parts with it | Daily work: change code, rebuild, restart the `webapi` resource in the dashboard (or F5 again), reload the browser |
 | `install` | The platform starts without the module, as in production; every build zips the module to `playground/out/content.zip` | Before a release: upload the zip on http://localhost:5070/host-modules (sign in as the dev platform admin, `admin@modular.local`) and activate it, which runs the real install path |
 
-The client parts load in the browser from the client-modules catalog, which has no local mode: in both profiles, every
-build copies them to `playground/out/client/`; upload `soft.square.net.WebApi.Modules.Content.Client.dll`, then
-`soft.square.net.Module.Content.dll`, on http://localhost:5070/client-modules (once per new version; the playground keeps
-the client catalog in `playground/.data`, not in the platform checkout, through the WebApi's
-`Modules:Settings:client-modules:ClientModules:Path` override). To use the pages, sign out and sign in again with the organisation `acme`.
+The client parts load in the browser from the client-modules catalog. The playground keeps that catalog in
+`playground/.data`, not in the platform checkout, through the WebApi's host override
+`Modules:Settings:client-modules:ClientModules:Path`.
+
+- **`dev` profile:** every start installs both client parts from their build output, the API client first. This is
+  the client-modules module's `ClientModules:Local`, Development only, also set through a host override. The menu item
+  "Contents Management" is there without an upload.
+- **`install` profile:** upload them yourself on http://localhost:5070/client-modules:
+  `soft.square.net.WebApi.Modules.Content.Client.dll` first, then `soft.square.net.Module.Content.dll`. Both are in
+  `playground/out/client/`. The catalog refuses the UI until the API client is installed.
+
+To use the pages, sign out, then sign in with the organisation `acme` as one of its dev accounts. The passwords are
+in the platform's `WebApi.Identity.Server/appsettings.Development.json`.
+
+| Account | Content permissions in `acme` (given by the playground) |
+| --- | --- |
+| `acme-admin@modular.local` | All of them (`content.*`): taxonomy, writing, the review steps, publishing |
+| `editor@modular.local` | `content.author`: writes posts and submits them for review |
+
+The platform admin (`admin@modular.local`) has no tenant, so the pages show "400: no tenant" for it.
 
 ```bash
 dotnet run --project playground --launch-profile dev
@@ -92,8 +107,10 @@ dotnet run --project playground --launch-profile install
 ```
 
 In Development the platform seeds the dev tenants `acme` and `globex` on the playground's server, so tenant APIs work
-right away: call them with the header `X-Tenant: acme`. Writing content needs the module's permissions in that tenant
-(a tenant role grant); the platform admin alone gets 403 there. Data stays in the Docker volume
+right away: call them with the header `X-Tenant: acme`. Writing content needs the module's permissions in that tenant.
+The playground gives them to the dev accounts above through the WebApi's `Access:DevGrants` (Development only, by
+email). The first time each account calls the API in `acme`, it gets them as ordinary grants with the source `dev`.
+Data stays in the Docker volume
 `content-playground-data` and in `playground/.data` (the host and client module catalogs); delete both to start over.
 
 The playground is not in `ModularBlazor.Module.Content.slnx`: CI builds the module without a platform checkout.

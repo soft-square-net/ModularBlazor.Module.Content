@@ -1,6 +1,6 @@
 // Content playground: a small platform with this repo's module in it, for local development. Two loops:
 //
-//   dev (default, launch profile "dev"): the WebApi loads the module straight from its build output (Modules:Local,
+//   dev (default, launch profile "dev"): the WebApi loads the module, and its client parts, straight from their build output (Modules:Local and ClientModules:Local,
 //     Development only). Change code, rebuild, restart the "webapi" resource in the dashboard (or F5 again): the new
 //     build is installed and active, with no packing or uploading.
 //   install (launch profile "install"): the platform starts without the module, as in production. Every build zips
@@ -68,10 +68,26 @@ var webApi = builder.AddProject<Projects.WebApi>("webapi", launchProfileName: nu
     .WithEnvironment("Auth__Authority", Issuer)
     .WithEnvironment("Auth__Audience", "modular-webapi")
     .WithEnvironment("Cors__AllowedOrigins__0", ClientOrigin)
+    // Development only (Access:DevGrants): the module's permissions for the dev accounts of tenant acme, written as
+    // ordinary grants (source "dev") the first time each one calls the API there. acme-admin may do everything;
+    // editor@modular.local writes posts, so the review steps can be tried with two people.
+    .WithEnvironment("Access__DevGrants__0__Tenant", "acme")
+    .WithEnvironment("Access__DevGrants__0__Email", "acme-admin@modular.local")
+    .WithEnvironment("Access__DevGrants__0__Permissions__0", "content.*")
+    .WithEnvironment("Access__DevGrants__1__Tenant", "acme")
+    .WithEnvironment("Access__DevGrants__1__Email", "editor@modular.local")
+    .WithEnvironment("Access__DevGrants__1__Permissions__0", "content.author")
     .WaitFor(identity)
     .WithHttpHealthCheck("/health");
 if (mode == "dev")
-    webApi.WithEnvironment("Modules__Local__content", Metadata("ModuleOutput"));
+{
+    // The server part from its build output (Modules:Local), and the client parts too (the client-modules module's
+    // ClientModules:Local, set through a host override): every start installs what changed, the API client first.
+    const string ClientLocal = "Modules__Settings__client-modules__ClientModules__Local__";
+    webApi.WithEnvironment("Modules__Local__content", Metadata("ModuleOutput"))
+        .WithEnvironment(ClientLocal + "WebApi.Modules.Content.Client", Metadata("ApiClientOutput"))
+        .WithEnvironment(ClientLocal + "Module.Content", Metadata("UiOutput"));
+}
 
 builder.AddProject<Projects.ModularBlazor_BlzWebClient>("blzwebclient", launchProfileName: null)
     .WithHttpEndpoint(port: ClientPort)
