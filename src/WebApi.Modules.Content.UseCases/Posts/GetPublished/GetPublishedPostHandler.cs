@@ -1,0 +1,23 @@
+using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
+using soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specifications;
+
+namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts.GetPublished;
+
+public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQueryHandler<GetPublishedPostQuery, Result<PublishedPost>>
+{
+    private const string Legacy = "legacy-";
+
+    public async ValueTask<Result<PublishedPost>> Handle(GetPublishedPostQuery query, CancellationToken ct)
+    {
+        var publicId = query.PublicId;
+        var post = publicId.StartsWith(Legacy, StringComparison.Ordinal) && int.TryParse(publicId.AsSpan(Legacy.Length), out var legacyId)
+            ? await reader.FirstOrDefaultAsync(new PublishedPostByLegacyIdSpec(legacyId), ct)
+            : await reader.FirstOrDefaultAsync(new PublishedPostByPublicIdSpec(publicId), ct);
+        if (post?.PublishedAt is not { } publishedAt) return Result<PublishedPost>.NotFound("Published Post was not found.");
+
+        var document = PostDetails.ReadDocument(post.PublishedDocumentJson, post.PublishedTitle ?? post.Title, post.PublishedBody ?? post.Body,
+            "The published Post document is invalid.");
+        return new PublishedPost(post.Id, post.StablePublicId, PostDetails.Permalink(post.StablePublicId), post.PostKind, post.PressId,
+            post.CategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion, document);
+    }
+}

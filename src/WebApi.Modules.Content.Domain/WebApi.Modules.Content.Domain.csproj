@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="soft.square.net.ModularBlazor.Module.Sdk" />
-
-  <!-- Contents domain: presses, categories, Posts and their workflow rules. References: WebApi.SharedKernel (the Module SDK). -->
-
-</Project>

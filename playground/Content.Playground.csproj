@@ -12,8 +12,9 @@
     <OutputType>Exe</OutputType>
     <UserSecretsId>modularblazor-content-playground</UserSecretsId>
     <PlatformRoot Condition="'$(PlatformRoot)' == ''">$(MSBuildThisFileDirectory)..\..\Platform\</PlatformRoot>
-    <ModuleProject>..\src\WebApi.Modules.Content.Infrastructure\WebApi.Modules.Content.Infrastructure.csproj</ModuleProject>
-    <ModuleOutput>$(MSBuildThisFileDirectory)..\src\WebApi.Modules.Content.Infrastructure\bin\$(Configuration)\net10.0\</ModuleOutput>
+    <!-- The module's entry project (IRuntimeModule, endpoints); its build output holds every layer. -->
+    <ModuleProject>..\src\WebApi.Modules.Content.Web\WebApi.Modules.Content.Web.csproj</ModuleProject>
+    <ModuleOutput>$(MSBuildThisFileDirectory)..\src\WebApi.Modules.Content.Web\bin\$(Configuration)\net10.0\</ModuleOutput>
     <!-- Install loop: the module's build output, zipped like an upload (out/ is git-ignored). -->
     <ModulePackage>$(MSBuildThisFileDirectory)out\content.zip</ModulePackage>
   </PropertyGroup>
