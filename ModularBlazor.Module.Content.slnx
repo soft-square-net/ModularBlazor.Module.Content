@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Module.Content/Module.Content.csproj" />
+  </Folder>
   <Project Path="src/WebApi.Modules.Content.Application/WebApi.Modules.Content.Application.csproj" />
   <Project Path="src/WebApi.Modules.Content.Client/WebApi.Modules.Content.Client.csproj" />
   <Project Path="src/WebApi.Modules.Content.Domain/WebApi.Modules.Content.Domain.csproj" />

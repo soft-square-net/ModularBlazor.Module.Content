@@ -1,0 +1,201 @@
+@page "/contents"
+@inherits ContentPageBase
+
+@*
+  Contents Management: the tenant's posts in one of the workflow views (GET /api/content/posts?view=...), and a new post
+  form (POST /api/content/posts). A row opens the post. Presses and categories are on the Taxonomy page.
+*@
+
+<PageTitle>Contents Management</PageTitle>
+
+<div class="mud-container ct-page">
+  <header class="ct-header">
+    <div>
+      <h1 class="mud-typography mud-typography-h4">Contents Management</h1>
+      <p class="mud-typography mud-typography-body1 ct-muted">
+        Posts of your organisation and their way through review to publication. What you may do depends on your
+        content permissions and, for the review steps, on your shift.
+      </p>
+    </div>
+    <div class="ct-actions">
+      <div class="mud-input-control ct-inline">
+        <label class="mud-input-label" for="ct-view">View</label>
+        <div class="mud-input-wrapper mud-input-wrapper--select mud-input-wrapper--dense">
+          <select id="ct-view" class="mud-input-slot" value="@_view" @onchange="ViewChangedAsync">
+            <option value="@PostView.Mine">My posts</option>
+            <option value="@PostView.Queue">Shift queue</option>
+            <option value="@PostView.Review">My reviews</option>
+            <option value="@PostView.Desk">Desk</option>
+          </select>
+        </div>
+      </div>
+      <a href="contents/taxonomy" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium">Presses &amp; categories</a>
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
+      <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="OpenCreate" disabled="@Busy">New post</button>
+    </div>
+  </header>
+
+  <div class="ct-facts">
+    <span class="ct-chip">Posts <strong>@_posts.Count</strong></span>
+    @foreach (var group in _posts.GroupBy(p => p.State).OrderBy(g => g.Key))
+    {
+      <span class="ct-chip">@Words(group.Key) <strong>@group.Count()</strong></span>
+    }
+  </div>
+
+  @if (Error is not null)
+  {
+    <p class="mud-typography mud-typography-body2 ct-error" role="alert">@Error</p>
+  }
+
+  @if (_form is not null)
+  {
+    <section class="mud-paper mud-elevation-2 ct-card">
+      <h2 class="mud-typography mud-typography-h6">New post</h2>
+      @if (_categories.Count == 0)
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">
+          There are no categories yet. Add a press and a category on <a href="contents/taxonomy">Presses &amp; categories</a> first.
+        </p>
+      }
+      <form class="ct-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
+        <div class="ct-grid">
+          <div class="mud-input-control">
+            <label class="mud-input-label" for="ct-category">Category</label>
+            <div class="mud-input-wrapper mud-input-wrapper--select">
+              <select id="ct-category" class="mud-input-slot" @bind="_form.CategoryId" required>
+                <option value="">Choose…</option>
+                @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.Name))
+                {
+                  <option value="@category.Id">@PressName(category.PressId) / @category.Name</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="mud-input-control">
+            <label class="mud-input-label" for="ct-kind">Kind</label>
+            <div class="mud-input-wrapper mud-input-wrapper--select">
+              <select id="ct-kind" class="mud-input-slot" @bind="_form.Kind">
+                @foreach (var kind in Enum.GetValues<PostKind>())
+                {
+                  <option value="@kind">@Words(kind)</option>
+                }
+              </select>
+            </div>
+          </div>
+          <div class="mud-input-control ct-wide">
+            <label class="mud-input-label" for="ct-title">Title</label>
+            <div class="mud-input-wrapper">
+              <input id="ct-title" class="mud-input-slot" @bind="_form.Title" required maxlength="300" />
+            </div>
+          </div>
+          <div class="mud-input-control ct-wide">
+            <label class="mud-input-label" for="ct-body">Body</label>
+            <div class="mud-input-wrapper">
+              <textarea id="ct-body" class="mud-input-slot ct-body" rows="8" @bind="_form.Body"></textarea>
+            </div>
+            <div class="mud-input-helper-text">Saved as a draft. Submit it for review from the post's page.</div>
+          </div>
+        </div>
+        <div class="ct-row-actions">
+          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || _categories.Count == 0)">Create draft</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _form = null">Cancel</button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <section class="mud-paper mud-elevation-1 ct-card">
+    <MudTailDataTable @ref="_table" Columns="Columns" OnRowClick="OpenPost" EmptyText="No posts in this view." />
+  </section>
+</div>
+
+@code {
+  private sealed class PostForm
+  {
+    public string CategoryId { get; set; } = "";
+    public PostKind Kind { get; set; } = PostKind.Article;
+    public string Title { get; set; } = "";
+    public string? Body { get; set; }
+  }
+
+  private static readonly IReadOnlyList<object> Columns =
+  [
+    new { key = "id", title = "#", type = "number", width = "80px" },
+    new { key = "title", title = "Title" },
+    new { key = "kind", title = "Kind", type = "enum", options = Enum.GetValues<PostKind>().Select(k => Words(k)).ToArray(), width = "130px" },
+    new { key = "category", title = "Category" },
+    new { key = "state", title = "State", type = "enum", options = Enum.GetValues<PostState>().Select(s => Words(s)).ToArray(), width = "170px" },
+    new { key = "scheduled", title = "Scheduled for" },
+    new { key = "updated", title = "Updated" },
+  ];
+
+  private MudTailDataTable? _table;
+  private PostView _view = PostView.Mine;
+  private List<PostSummary> _posts = [];
+  private List<PressDto> _presses = [];
+  private List<CategoryDto> _categories = [];
+  private PostForm? _form;
+
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (firstRender) await LoadAsync();
+  }
+
+  private async Task LoadAsync()
+  {
+    await RunAsync(async () =>
+    {
+      var client = Content;
+      _presses = (await client.ListPressesAsync()).ToList();
+      _categories = (await client.ListCategoriesAsync()).ToList();
+      _posts = (await client.ListPostsAsync(_view)).OrderByDescending(p => p.UpdatedAt).ToList();
+      if (_table is not null) await _table.SetDataAsync(_posts.Select(ToRow).ToList());
+    });
+  }
+
+  private object ToRow(PostSummary p) => new
+  {
+    id = p.Id.ToString(),
+    title = p.Title,
+    kind = Words(p.PostKind),
+    category = $"{PressName(p.PressId)} / {CategoryName(p.CategoryId)}",
+    state = Words(p.State),
+    scheduled = When(p.ScheduledFor),
+    updated = When(p.UpdatedAt),
+  };
+
+  private string PressName(string id) => _presses.FirstOrDefault(p => p.Id == id)?.Name ?? id;
+
+  private string CategoryName(string id) => _categories.FirstOrDefault(c => c.Id == id)?.Name ?? id;
+
+  private async Task ViewChangedAsync(ChangeEventArgs e)
+  {
+    if (Enum.TryParse<PostView>(e.Value?.ToString(), out var view)) _view = view;
+    await LoadAsync();
+  }
+
+  private void OpenCreate() => _form = new PostForm { CategoryId = _categories.Count == 1 ? _categories[0].Id : "" };
+
+  private void OpenPost(string id) => Nav.NavigateTo($"contents/posts/{Uri.EscapeDataString(id)}");
+
+  private async Task CreateAsync()
+  {
+    if (_form is null) return;
+    var form = _form;
+    PostDetail? created = null;
+    var ok = await RunAsync(async () =>
+    {
+      created = await Content.CreatePostAsync(new NewPost
+      {
+        CategoryId = form.CategoryId,
+        Title = form.Title.Trim(),
+        Body = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body,
+        PostKind = form.Kind,
+      });
+      await MudTail.ToastAsync($"Draft #{created.Id} created.", "success");
+      _form = null;
+    });
+    if (ok && created is not null) OpenPost(created.Id.ToString());
+  }
+}

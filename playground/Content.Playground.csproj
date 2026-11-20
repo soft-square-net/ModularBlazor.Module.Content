@@ -28,8 +28,11 @@
     <ProjectReference Include="$(PlatformRoot)src\WebApi\WebApi\WebApi.csproj" />
     <ProjectReference Include="$(PlatformRoot)src\WebApi\Identity\WebApi.Identity.Server\WebApi.Identity.Server.csproj" />
     <ProjectReference Include="$(PlatformRoot)src\apps\blazor\ModularBlazor.BlzWebClient\ModularBlazor.BlzWebClient.csproj" />
-    <!-- The module: built before the playground starts, never referenced or run as a project (the WebApi loads it). -->
+    <!-- The module: built before the playground starts, never referenced or run as a project (the WebApi loads it;
+         the client parts are uploaded on the client's Client Modules page). -->
     <ProjectReference Include="$(ModuleProject)" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\src\WebApi.Modules.Content.Client\WebApi.Modules.Content.Client.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\src\Module.Content\Module.Content.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,11 +47,18 @@
            Text="No ModularBlazor.Platform checkout at '$(PlatformRoot)'. Clone https://github.com/soft-square-net/ModularBlazor.Platform next to this repo (as 'Platform'), or pass -p:PlatformRoot=&lt;path to it&gt;/." />
   </Target>
 
-  <!-- Install loop: zip the module's build output after every build, ready to upload on the client's Host Modules page. -->
+  <!-- After every build, the module's parts ready to upload (the planned .modpkg bundle holds the same parts):
+         out/content.zip       server part, for the Host Modules page (install loop only; the dev loop loads it directly)
+         out/client/*.dll      client parts, for the Client Modules page: the API client (hidden) first, then the UI -->
   <Target Name="PackModuleForUpload" AfterTargets="Build">
-    <MakeDir Directories="$(MSBuildThisFileDirectory)out" />
+    <ItemGroup>
+      <_ClientPart Include="$(MSBuildThisFileDirectory)..\src\WebApi.Modules.Content.Client\bin\$(Configuration)\net10.0\soft.square.net.WebApi.Modules.Content.Client.dll" />
+      <_ClientPart Include="$(MSBuildThisFileDirectory)..\src\Module.Content\bin\$(Configuration)\net10.0\soft.square.net.Module.Content.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(MSBuildThisFileDirectory)out\client" />
     <ZipDirectory SourceDirectory="$(ModuleOutput)" DestinationFile="$(ModulePackage)" Overwrite="true" />
-    <Message Importance="high" Text="Module package for upload: $([System.IO.Path]::GetFullPath('$(ModulePackage)'))" />
+    <Copy SourceFiles="@(_ClientPart)" DestinationFolder="$(MSBuildThisFileDirectory)out\client" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Module parts for upload: $([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)out'))" />
   </Target>
 
 </Project>

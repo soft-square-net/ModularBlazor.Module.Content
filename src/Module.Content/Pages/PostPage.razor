@@ -1,0 +1,215 @@
+@page "/contents/posts/{Id:int}"
+@inherits ContentPageBase
+
+@*
+  One post (GET /api/content/posts/{id}): edit it, move it through the workflow (submit, accept, assign, approve,
+  return, schedule, publish) and read its history. The buttons follow the post's state; the API decides whether you
+  may, from your content permissions and your shift. Every step sends the version you see (409 if it changed).
+*@
+
+<PageTitle>Post @Id</PageTitle>
+
+<div class="mud-container ct-page">
+  <a href="contents" class="mud-button-root mud-button-text mud-button-primary mud-button-small ct-back">&larr; Contents Management</a>
+
+  <header class="ct-header">
+    <div>
+      <h1 class="mud-typography mud-typography-h4">@(_post?.Title ?? $"Post {Id}")</h1>
+      @if (_post is not null)
+      {
+        <p class="mud-typography mud-typography-body1 ct-muted">
+          #@_post.Id · @Words(_post.PostKind) · @_post.PressId / @_post.CategoryId · version @_post.Version
+        </p>
+      }
+    </div>
+    <div class="ct-actions">
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
+    </div>
+  </header>
+
+  @if (_post is not null)
+  {
+    <div class="ct-facts">
+      <span class="ct-chip ct-state">State <strong>@Words(_post.State)</strong></span>
+      <span class="ct-chip">Owner <strong>@_post.OwnerId</strong></span>
+      @if (_post.AssigneeId is not null) { <span class="ct-chip">Assignee <strong>@_post.AssigneeId</strong></span> }
+      @if (_post.AcceptedShiftId is not null) { <span class="ct-chip">Shift <strong>@_post.AcceptedShiftId</strong></span> }
+      @if (_post.ScheduledFor is not null) { <span class="ct-chip">Scheduled for <strong>@When(_post.ScheduledFor)</strong></span> }
+      @if (_post.PublishedAt is not null) { <span class="ct-chip">Published <strong>@When(_post.PublishedAt)</strong></span> }
+      @if (!string.IsNullOrEmpty(_post.Permalink)) { <span class="ct-chip">Permalink <strong>@_post.Permalink</strong></span> }
+    </div>
+  }
+
+  @if (Error is not null)
+  {
+    <p class="mud-typography mud-typography-body2 ct-error" role="alert">@Error</p>
+  }
+
+  @if (_post is not null)
+  {
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">Workflow</h2>
+      <div class="ct-row-actions">
+        @if (_post.State is PostState.Draft or PostState.Returned)
+        {
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SubmitAsync" disabled="@Busy">Submit for review</button>
+        }
+        @if (_post.State is PostState.InReview)
+        {
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="ApproveAsync" disabled="@Busy">Approve</button>
+        }
+        @if (_post.State is PostState.Approved or PostState.Scheduled or PostState.AwaitingDeskReapproval)
+        {
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="PublishAsync" disabled="@Busy">Publish now</button>
+        }
+      </div>
+
+      @if (_post.State is PostState.Submitted)
+      {
+        <form class="ct-inline-form" @onsubmit="AcceptAsync" @onsubmit:preventDefault>
+          <div class="mud-input-control ct-inline">
+            <label class="mud-input-label" for="ct-shift">Shift</label>
+            <div class="mud-input-wrapper"><input id="ct-shift" class="mud-input-slot" @bind="_shiftId" required placeholder="shift id" /></div>
+          </div>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Accept into shift</button>
+        </form>
+      }
+      @if (_post.State is PostState.Accepted or PostState.InReview)
+      {
+        <form class="ct-inline-form" @onsubmit="AssignAsync" @onsubmit:preventDefault>
+          <div class="mud-input-control ct-inline">
+            <label class="mud-input-label" for="ct-assignee">Editor</label>
+            <div class="mud-input-wrapper"><input id="ct-assignee" class="mud-input-slot" @bind="_assigneeId" required placeholder="user id" /></div>
+          </div>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Assign</button>
+        </form>
+      }
+      @if (_post.State is PostState.Approved or PostState.Scheduled)
+      {
+        <form class="ct-inline-form" @onsubmit="ScheduleAsync" @onsubmit:preventDefault>
+          <div class="mud-input-control ct-inline">
+            <label class="mud-input-label" for="ct-at">Publish at (local time)</label>
+            <div class="mud-input-wrapper"><input id="ct-at" type="datetime-local" class="mud-input-slot" @bind="_publishAt" required /></div>
+          </div>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Schedule</button>
+        </form>
+      }
+      @if (_post.State is PostState.Submitted or PostState.Accepted or PostState.InReview or PostState.Approved
+             or PostState.Scheduled or PostState.AwaitingDeskReapproval)
+      {
+        <form class="ct-inline-form" @onsubmit="ReturnAsync" @onsubmit:preventDefault>
+          <div class="mud-input-control ct-inline ct-grow">
+            <label class="mud-input-label" for="ct-reason">Reason</label>
+            <div class="mud-input-wrapper"><input id="ct-reason" class="mud-input-slot" @bind="_returnReason" placeholder="what the author should change" /></div>
+          </div>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-error mud-button-medium" disabled="@Busy">Return to author</button>
+        </form>
+      }
+    </section>
+
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">Content</h2>
+      <form class="ct-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
+        <div class="ct-grid">
+          <div class="mud-input-control ct-wide">
+            <label class="mud-input-label" for="ct-edit-title">Title</label>
+            <div class="mud-input-wrapper"><input id="ct-edit-title" class="mud-input-slot" @bind="_title" required maxlength="300" /></div>
+          </div>
+          <div class="mud-input-control ct-wide">
+            <label class="mud-input-label" for="ct-edit-body">Body</label>
+            <div class="mud-input-wrapper"><textarea id="ct-edit-body" class="mud-input-slot ct-body" rows="12" @bind="_body"></textarea></div>
+            @if (!_post.OwnerMayEdit && _post.State is not (PostState.Draft or PostState.Returned))
+            {
+              <div class="mud-input-helper-text">The owner's edit window has closed; reviewers on shift may still edit.</div>
+            }
+          </div>
+        </div>
+        <div class="ct-row-actions">
+          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@Busy">Save</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">History</h2>
+      @if (_post.History.Count == 0)
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">No events yet.</p>
+      }
+      else
+      {
+        <ol class="ct-history">
+          @foreach (var e in _post.History.OrderByDescending(e => e.At))
+          {
+            <li>
+              <span class="ct-muted">@When(e.At)</span>
+              <strong>@e.Action</strong> by @e.Actor → @Words(e.State)
+              @if (!string.IsNullOrWhiteSpace(e.Detail)) { <span class="ct-muted">(@e.Detail)</span> }
+            </li>
+          }
+        </ol>
+      }
+    </section>
+  }
+</div>
+
+@code {
+  [Parameter] public int Id { get; set; }
+
+  private PostDetail? _post;
+  private string _title = "";
+  private string? _body;
+  private string? _shiftId;
+  private string? _assigneeId;
+  private string? _returnReason;
+  private DateTime? _publishAt;
+
+  protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+  private async Task LoadAsync() => await RunAsync(async () => Show(await Content.GetPostAsync(Id)));
+
+  private void Show(PostDetail post)
+  {
+    _post = post;
+    _title = post.Title;
+    _body = post.Body;
+    _shiftId ??= post.AcceptedShiftId;
+    _publishAt ??= post.ScheduledFor?.LocalDateTime ?? DateTime.Now.AddHours(1);
+  }
+
+  /// <summary>One workflow step on the version on screen, then the post as the API returns it.</summary>
+  private async Task StepAsync(Func<ContentClient, int, Task<PostDetail>> step, string done)
+  {
+    if (_post is null) return;
+    var version = _post.Version;
+    await RunAsync(async () =>
+    {
+      Show(await step(Content, version));
+      await MudTail.ToastAsync(done, "success");
+    });
+  }
+
+  private Task SaveAsync() => StepAsync((c, v) => c.EditPostAsync(Id, new PostEdit { Version = v, Title = _title.Trim(), Body = _body }), "Saved.");
+
+  private Task SubmitAsync() => StepAsync((c, v) => c.SubmitPostAsync(Id, new VersionRequest { Version = v }), "Submitted for review.");
+
+  private Task AcceptAsync() => StepAsync((c, v) => c.AcceptPostAsync(Id, new AcceptRequest { Version = v, ShiftId = (_shiftId ?? "").Trim() }), "Accepted into the shift's queue.");
+
+  private Task AssignAsync() => StepAsync((c, v) => c.AssignPostAsync(Id, new Assignment { Version = v, AssigneeId = (_assigneeId ?? "").Trim() }), "Assigned.");
+
+  private Task ApproveAsync() => StepAsync((c, v) => c.ApprovePostAsync(Id, new VersionRequest { Version = v }), "Approved.");
+
+  private Task ReturnAsync() => StepAsync((c, v) => c.ReturnPostAsync(Id, new ReturnRequest
+  {
+    Version = v,
+    Reason = string.IsNullOrWhiteSpace(_returnReason) ? null : _returnReason.Trim(),
+  }), "Returned to the author.");
+
+  private Task ScheduleAsync() => StepAsync((c, v) => c.SchedulePostAsync(Id, new ScheduleRequest
+  {
+    Version = v,
+    PublishAt = new DateTimeOffset(_publishAt ?? DateTime.Now.AddHours(1)),
+  }), "Scheduled.");
+
+  private Task PublishAsync() => StepAsync((c, v) => c.PublishPostAsync(Id, new VersionRequest { Version = v }), "Published.");
+}

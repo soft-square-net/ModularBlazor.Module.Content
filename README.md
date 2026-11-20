@@ -12,6 +12,7 @@ src/WebApi.Modules.Content.Domain/           entities, aggregates, domain rules
 src/WebApi.Modules.Content.Application/      use cases, DTOs
 src/WebApi.Modules.Content.Infrastructure/   entry assembly: IRuntimeModule, endpoints, DbContext, tenant migrations
 src/WebApi.Modules.Content.Client/           typed API client (NSwag), shipped as a hidden client module
+src/Module.Content/                          Blazor client module "Contents Management": posts, workflow, presses and categories
 src/openapi/   the saved OpenAPI document the client is generated from
 playground/   Aspire AppHost: the platform (from a Platform checkout) with this module, see "Developing"
 tests/
@@ -44,6 +45,19 @@ adds a migration for every database provider.
 - An API client ships once, inside the bundle that owns the API, as a hidden client module. Modules that call it
   reference its package with `ExcludeAssets="runtime"` and declare a dependency with a version range in `module.json`.
 
+This repo's bundle has three parts:
+
+| Part | Project | Installed on |
+| --- | --- | --- |
+| server | `WebApi.Modules.Content.Infrastructure` (its build output, zipped) | Host Modules (`/host-modules`) |
+| client, hidden | `WebApi.Modules.Content.Client` (`WebApi.Modules.Content.Client`) | Client Modules (`/client-modules`) |
+| client | `Module.Content` (`Module.Content`): menu item "Contents Management", pages under `/contents` | Client Modules, after the API client |
+
+`Module.Content` lists the API client in its `Dependencies` and references it with `Private="false"`, so its output
+holds only `soft.square.net.Module.Content.dll`. Until the pack step exists the parts are uploaded one by one, in the
+order above. The pages call the tenant-bound Content API: sign in to a tenant (the client's sign-in page asks for the
+organisation) and hold the `content.*` permissions for what you do there.
+
 ## Developing
 
 `playground/` is a small Aspire AppHost: PostgreSQL, the identity service, one WebApi and the Blazor client, with this
@@ -63,6 +77,12 @@ module in it. It builds the platform from source, from a
 | `dev` (default) | The WebApi loads the module straight from `src/WebApi.Modules.Content.Infrastructure/bin/<Configuration>/net10.0` (`Modules:Local`, Development only): installed and active on start | Daily work: change code, rebuild, restart the `webapi` resource in the dashboard (or F5 again) |
 | `install` | The platform starts without the module, as in production; every build zips the module to `playground/out/content.zip` | Before a release: upload the zip on http://localhost:5070/host-modules (sign in as the dev platform admin, `admin@modular.local`) and activate it, which runs the real install path |
 
+The client parts load in the browser from the client-modules catalog, which has no local mode: in both profiles, every
+build copies them to `playground/out/client/`; upload `soft.square.net.WebApi.Modules.Content.Client.dll`, then
+`soft.square.net.Module.Content.dll`, on http://localhost:5070/client-modules (once per new version; the playground keeps
+the client catalog in `playground/.data`, not in the platform checkout, through the WebApi's
+`Modules:Settings:client-modules:ClientModules:Path` override). To use the pages, sign out and sign in again with the organisation `acme`.
+
 ```bash
 dotnet run --project playground --launch-profile dev
 ```
@@ -74,7 +94,7 @@ dotnet run --project playground --launch-profile install
 In Development the platform seeds the dev tenants `acme` and `globex` on the playground's server, so tenant APIs work
 right away: call them with the header `X-Tenant: acme`. Writing content needs the module's permissions in that tenant
 (a tenant role grant); the platform admin alone gets 403 there. Data stays in the Docker volume
-`content-playground-data` and in `playground/.data` (the module catalog); delete both to start over.
+`content-playground-data` and in `playground/.data` (the host and client module catalogs); delete both to start over.
 
 The playground is not in `ModularBlazor.Module.Content.slnx`: CI builds the module without a platform checkout.
 
