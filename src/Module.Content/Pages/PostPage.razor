@@ -7,36 +7,36 @@
   may, from your content permissions and your shift. Every step sends the version you see (409 if it changed).
 *@
 
-<PageTitle>Post @Id</PageTitle>
+<PageTitle>@L["Post {0}", Id]</PageTitle>
 
 <div class="mud-container ct-page">
-  <a href="contents" class="mud-button-root mud-button-text mud-button-primary mud-button-small ct-back">&larr; Contents Management</a>
+  <a href="contents" class="mud-button-root mud-button-text mud-button-primary mud-button-small ct-back">@L["← Contents Management"]</a>
 
   <header class="ct-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">@(_post?.Title ?? $"Post {Id}")</h1>
+      <h1 class="mud-typography mud-typography-h4">@(_post?.Title ?? L["Post {0}", Id])</h1>
       @if (_post is not null)
       {
         <p class="mud-typography mud-typography-body1 ct-muted">
-          #@_post.Id · @Words(_post.PostKind) · @_post.PressId / @_post.CategoryId · version @_post.Version
+          #@_post.Id · @Words(_post.PostKind) · @_post.PressId / @_post.CategoryId · @L["version {0}", _post.Version]
         </p>
       }
     </div>
     <div class="ct-actions">
-      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">@L["Refresh"]</button>
     </div>
   </header>
 
   @if (_post is not null)
   {
     <div class="ct-facts">
-      <span class="ct-chip ct-state">State <strong>@Words(_post.State)</strong></span>
-      <span class="ct-chip">Owner <strong>@_post.OwnerId</strong></span>
-      @if (_post.AssigneeId is not null) { <span class="ct-chip">Assignee <strong>@_post.AssigneeId</strong></span> }
-      @if (_post.AcceptedShiftId is not null) { <span class="ct-chip">Shift <strong>@_post.AcceptedShiftId</strong></span> }
-      @if (_post.ScheduledFor is not null) { <span class="ct-chip">Scheduled for <strong>@When(_post.ScheduledFor)</strong></span> }
-      @if (_post.PublishedAt is not null) { <span class="ct-chip">Published <strong>@When(_post.PublishedAt)</strong></span> }
-      @if (!string.IsNullOrEmpty(_post.Permalink)) { <span class="ct-chip">Permalink <strong>@_post.Permalink</strong></span> }
+      <span class="ct-chip ct-state">@L["State"] <strong>@Words(_post.State)</strong></span>
+      <span class="ct-chip">@L["Owner"] <strong>@_post.OwnerId</strong></span>
+      @if (_post.AssigneeId is not null) { <span class="ct-chip">@L["Assignee"] <strong>@_post.AssigneeId</strong></span> }
+      @if (_post.AcceptedShiftId is not null) { <span class="ct-chip">@L["Shift"] <strong>@_post.AcceptedShiftId</strong></span> }
+      @if (_post.ScheduledFor is not null) { <span class="ct-chip">@L["Scheduled for"] <strong>@When(_post.ScheduledFor)</strong></span> }
+      @if (_post.PublishedAt is not null) { <span class="ct-chip">@L["Published"] <strong>@When(_post.PublishedAt)</strong></span> }
+      @if (!string.IsNullOrEmpty(_post.Permalink)) { <span class="ct-chip">@L["Permalink"] <strong>@_post.Permalink</strong></span> }
     </div>
   }
 
@@ -48,19 +48,19 @@
   @if (_post is not null)
   {
     <section class="mud-paper mud-elevation-1 ct-card">
-      <h2 class="mud-typography mud-typography-h6">Workflow</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["Workflow"]</h2>
       <div class="ct-row-actions">
         @if (_post.State is PostState.Draft or PostState.Returned)
         {
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SubmitAsync" disabled="@Busy">Submit for review</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SubmitAsync" disabled="@Busy">@L["Submit for review"]</button>
         }
         @if (_post.State is PostState.InReview)
         {
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="ApproveAsync" disabled="@Busy">Approve</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="ApproveAsync" disabled="@Busy">@L["Approve"]</button>
         }
         @if (_post.State is PostState.Approved or PostState.Scheduled or PostState.AwaitingDeskReapproval)
         {
-          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="PublishAsync" disabled="@Busy">Publish now</button>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="PublishAsync" disabled="@Busy">@L["Publish now"]</button>
         }
       </div>
 
@@ -68,30 +68,30 @@
       {
         <form class="ct-inline-form" @onsubmit="AcceptAsync" @onsubmit:preventDefault>
           <div class="mud-input-control ct-inline">
-            <label class="mud-input-label" for="ct-shift">Shift</label>
-            <div class="mud-input-wrapper"><input id="ct-shift" class="mud-input-slot" @bind="_shiftId" required placeholder="shift id" /></div>
+            <label class="mud-input-label" for="ct-shift">@L["Shift"]</label>
+            <div class="mud-input-wrapper"><input id="ct-shift" class="mud-input-slot" @bind="_shiftId" required placeholder="@L["shift id"]" /></div>
           </div>
-          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Accept into shift</button>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">@L["Accept into shift"]</button>
         </form>
       }
       @if (_post.State is PostState.Accepted or PostState.InReview)
       {
         <form class="ct-inline-form" @onsubmit="AssignAsync" @onsubmit:preventDefault>
           <div class="mud-input-control ct-inline">
-            <label class="mud-input-label" for="ct-assignee">Editor</label>
-            <div class="mud-input-wrapper"><input id="ct-assignee" class="mud-input-slot" @bind="_assigneeId" required placeholder="user id" /></div>
+            <label class="mud-input-label" for="ct-assignee">@L["Editor"]</label>
+            <div class="mud-input-wrapper"><input id="ct-assignee" class="mud-input-slot" @bind="_assigneeId" required placeholder="@L["user id"]" /></div>
           </div>
-          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Assign</button>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">@L["Assign"]</button>
         </form>
       }
       @if (_post.State is PostState.Approved or PostState.Scheduled)
       {
         <form class="ct-inline-form" @onsubmit="ScheduleAsync" @onsubmit:preventDefault>
           <div class="mud-input-control ct-inline">
-            <label class="mud-input-label" for="ct-at">Publish at (local time)</label>
+            <label class="mud-input-label" for="ct-at">@L["Publish at (local time)"]</label>
             <div class="mud-input-wrapper"><input id="ct-at" type="datetime-local" class="mud-input-slot" @bind="_publishAt" required /></div>
           </div>
-          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">Schedule</button>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">@L["Schedule"]</button>
         </form>
       }
       @if (_post.State is PostState.Submitted or PostState.Accepted or PostState.InReview or PostState.Approved
@@ -99,42 +99,42 @@
       {
         <form class="ct-inline-form" @onsubmit="ReturnAsync" @onsubmit:preventDefault>
           <div class="mud-input-control ct-inline ct-grow">
-            <label class="mud-input-label" for="ct-reason">Reason</label>
-            <div class="mud-input-wrapper"><input id="ct-reason" class="mud-input-slot" @bind="_returnReason" placeholder="what the author should change" /></div>
+            <label class="mud-input-label" for="ct-reason">@L["Reason"]</label>
+            <div class="mud-input-wrapper"><input id="ct-reason" class="mud-input-slot" @bind="_returnReason" placeholder="@L["what the author should change"]" /></div>
           </div>
-          <button type="submit" class="mud-button-root mud-button-outlined mud-button-error mud-button-medium" disabled="@Busy">Return to author</button>
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-error mud-button-medium" disabled="@Busy">@L["Return to author"]</button>
         </form>
       }
     </section>
 
     <section class="mud-paper mud-elevation-1 ct-card">
-      <h2 class="mud-typography mud-typography-h6">Content</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["Content"]</h2>
       <form class="ct-form" @onsubmit="SaveAsync" @onsubmit:preventDefault>
         <div class="ct-grid">
           <div class="mud-input-control ct-wide">
-            <label class="mud-input-label" for="ct-edit-title">Title</label>
+            <label class="mud-input-label" for="ct-edit-title">@L["Title"]</label>
             <div class="mud-input-wrapper"><input id="ct-edit-title" class="mud-input-slot" @bind="_title" required maxlength="300" /></div>
           </div>
           <div class="mud-input-control ct-wide">
-            <label class="mud-input-label" for="ct-edit-body">Body</label>
+            <label class="mud-input-label" for="ct-edit-body">@L["Body"]</label>
             <div class="mud-input-wrapper"><textarea id="ct-edit-body" class="mud-input-slot ct-body" rows="12" @bind="_body"></textarea></div>
             @if (!_post.OwnerMayEdit && _post.State is not (PostState.Draft or PostState.Returned))
             {
-              <div class="mud-input-helper-text">The owner's edit window has closed; reviewers on shift may still edit.</div>
+              <div class="mud-input-helper-text">@L["The owner's edit window has closed; reviewers on shift may still edit."]</div>
             }
           </div>
         </div>
         <div class="ct-row-actions">
-          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@Busy">Save</button>
+          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@Busy">@L["Save"]</button>
         </div>
       </form>
     </section>
 
     <section class="mud-paper mud-elevation-1 ct-card">
-      <h2 class="mud-typography mud-typography-h6">History</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["History"]</h2>
       @if (_post.History.Count == 0)
       {
-        <p class="mud-typography mud-typography-body2 ct-muted">No events yet.</p>
+        <p class="mud-typography mud-typography-body2 ct-muted">@L["No events yet."]</p>
       }
       else
       {
@@ -185,7 +185,7 @@
     await RunAsync(async () =>
     {
       Show(await step(Content, version));
-      await MudTail.ToastAsync(done, "success");
+      await MudTail.ToastAsync(L[done], "success");
     });
   }
 

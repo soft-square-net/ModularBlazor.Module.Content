@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
+using Microsoft.Extensions.Localization;
 using soft.square.net.ModularBlazor.Abstractions;
 using soft.square.net.ModularBlazor.Abstractions.MudTail;
 using soft.square.net.WebApi.Modules.Content.Client;
@@ -15,6 +16,12 @@ public abstract class ContentPageBase : ComponentBase
     [Inject] protected IHttpClientFactory HttpClients { get; set; } = default!;
     [Inject] protected MudTailRuntime MudTail { get; set; } = default!;
     [Inject] protected NavigationManager Nav { get; set; } = default!;
+    [Inject] protected IStringLocalizerFactory Texts { get; set; } = default!;
+
+    private IStringLocalizer? _l;
+
+    /// <summary>This module's texts (its embedded i18n/{culture}.json); the keys are the English texts.</summary>
+    protected IStringLocalizer L => _l ??= Texts.Create(GetType());
 
     /// <summary>Content routes (/api/content/...) reach the pool that runs the module through the gateway.</summary>
     protected ContentClient Content => new(HttpClients.CreateClient(HttpClientNames.WebApi));
@@ -54,17 +61,17 @@ public abstract class ContentPageBase : ComponentBase
         return true;
     }
 
-    protected static string Describe(Exception ex) => ex switch
+    protected string Describe(Exception ex) => ex switch
     {
         ContentApiException { StatusCode: 400 } api when Mentions(api, "tenant") =>
-            "400: no tenant. Contents belong to a tenant: sign in to one (your organisation) to manage its contents.",
-        ContentApiException { StatusCode: 401 } => "401: the gateway did not accept the access token. Sign in again.",
+            L["400: no tenant. Contents belong to a tenant: sign in to one (your organisation) to manage its contents."],
+        ContentApiException { StatusCode: 401 } => L["401: the gateway did not accept the access token. Sign in again."],
         ContentApiException { StatusCode: 403 } api =>
-            $"403: {ProblemDetail(api) ?? "your account lacks the content permission for this (content.* in this tenant)."}",
-        ContentApiException { StatusCode: 404 } api => $"404: {ProblemDetail(api) ?? "not found, or not visible to you."}",
-        ContentApiException { StatusCode: 409 } api => $"409: {ProblemDetail(api) ?? "someone changed it meanwhile. Reload and try again."}",
+            $"403: {ProblemDetail(api) ?? L["your account lacks the content permission for this (content.* in this tenant)."]}",
+        ContentApiException { StatusCode: 404 } api => $"404: {ProblemDetail(api) ?? L["not found, or not visible to you."]}",
+        ContentApiException { StatusCode: 409 } api => $"409: {ProblemDetail(api) ?? L["someone changed it meanwhile. Reload and try again."]}",
         ContentApiException api => $"{api.StatusCode}: {ProblemDetail(api) ?? FirstLine(api.Response) ?? FirstLine(api.Message)}",
-        HttpRequestException http => $"The gateway is not reachable ({http.Message}).",
+        HttpRequestException http => L["The gateway is not reachable ({0}).", http.Message],
         _ => ex.Message,
     };
 
@@ -91,8 +98,10 @@ public abstract class ContentPageBase : ComponentBase
 
     protected static string When(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "";
 
-    /// <summary>"InReview" → "In review".</summary>
-    protected static string Words(Enum value)
+    /// <summary>"InReview" → "In review", in the user's language (the key is the English words).</summary>
+    protected string Words(Enum value) => L[EnglishWords(value)];
+
+    private static string EnglishWords(Enum value)
     {
         var text = value.ToString();
         var result = new System.Text.StringBuilder(text.Length + 4);

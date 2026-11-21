@@ -6,37 +6,36 @@
   form (POST /api/content/posts). A row opens the post. Presses and categories are on the Taxonomy page.
 *@
 
-<PageTitle>Contents Management</PageTitle>
+<PageTitle>@L["Contents Management"]</PageTitle>
 
 <div class="mud-container ct-page">
   <header class="ct-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">Contents Management</h1>
+      <h1 class="mud-typography mud-typography-h4">@L["Contents Management"]</h1>
       <p class="mud-typography mud-typography-body1 ct-muted">
-        Posts of your organisation and their way through review to publication. What you may do depends on your
-        content permissions and, for the review steps, on your shift.
+        @L["Posts of your organisation and their way through review to publication. What you may do depends on your content permissions and, for the review steps, on your shift."]
       </p>
     </div>
     <div class="ct-actions">
       <div class="mud-input-control ct-inline">
-        <label class="mud-input-label" for="ct-view">View</label>
+        <label class="mud-input-label" for="ct-view">@L["View"]</label>
         <div class="mud-input-wrapper mud-input-wrapper--select mud-input-wrapper--dense">
           <select id="ct-view" class="mud-input-slot" value="@_view" @onchange="ViewChangedAsync">
-            <option value="@PostView.Mine">My posts</option>
-            <option value="@PostView.Queue">Shift queue</option>
-            <option value="@PostView.Review">My reviews</option>
-            <option value="@PostView.Desk">Desk</option>
+            <option value="@PostView.Mine">@L["My posts"]</option>
+            <option value="@PostView.Queue">@L["Shift queue"]</option>
+            <option value="@PostView.Review">@L["My reviews"]</option>
+            <option value="@PostView.Desk">@L["Desk"]</option>
           </select>
         </div>
       </div>
-      <a href="contents/taxonomy" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium">Presses &amp; categories</a>
-      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
-      <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="OpenCreate" disabled="@Busy">New post</button>
+      <a href="contents/taxonomy" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium">@L["Presses & categories"]</a>
+      <button type="button" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" @onclick="LoadAsync" disabled="@Busy">@L["Refresh"]</button>
+      <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="OpenCreate" disabled="@Busy">@L["New post"]</button>
     </div>
   </header>
 
   <div class="ct-facts">
-    <span class="ct-chip">Posts <strong>@_posts.Count</strong></span>
+    <span class="ct-chip">@L["Posts"] <strong>@_posts.Count</strong></span>
     @foreach (var group in _posts.GroupBy(p => p.State).OrderBy(g => g.Key))
     {
       <span class="ct-chip">@Words(group.Key) <strong>@group.Count()</strong></span>
@@ -51,20 +50,20 @@
   @if (_form is not null)
   {
     <section class="mud-paper mud-elevation-2 ct-card">
-      <h2 class="mud-typography mud-typography-h6">New post</h2>
+      <h2 class="mud-typography mud-typography-h6">@L["New post"]</h2>
       @if (_categories.Count == 0)
       {
         <p class="mud-typography mud-typography-body2 ct-muted">
-          There are no categories yet. Add a press and a category on <a href="contents/taxonomy">Presses &amp; categories</a> first.
+          @((MarkupString)L["There are no categories yet. Add a press and a category on <a href=\"contents/taxonomy\">Presses &amp; categories</a> first."].Value)
         </p>
       }
       <form class="ct-form" @onsubmit="CreateAsync" @onsubmit:preventDefault>
         <div class="ct-grid">
           <div class="mud-input-control">
-            <label class="mud-input-label" for="ct-category">Category</label>
+            <label class="mud-input-label" for="ct-category">@L["Category"]</label>
             <div class="mud-input-wrapper mud-input-wrapper--select">
               <select id="ct-category" class="mud-input-slot" @bind="_form.CategoryId" required>
-                <option value="">Choose…</option>
+                <option value="">@L["Choose…"]</option>
                 @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.Name))
                 {
                   <option value="@category.Id">@PressName(category.PressId) / @category.Name</option>
@@ -73,7 +72,7 @@
             </div>
           </div>
           <div class="mud-input-control">
-            <label class="mud-input-label" for="ct-kind">Kind</label>
+            <label class="mud-input-label" for="ct-kind">@L["Kind"]</label>
             <div class="mud-input-wrapper mud-input-wrapper--select">
               <select id="ct-kind" class="mud-input-slot" @bind="_form.Kind">
                 @foreach (var kind in Enum.GetValues<PostKind>())
@@ -84,29 +83,29 @@
             </div>
           </div>
           <div class="mud-input-control ct-wide">
-            <label class="mud-input-label" for="ct-title">Title</label>
+            <label class="mud-input-label" for="ct-title">@L["Title"]</label>
             <div class="mud-input-wrapper">
               <input id="ct-title" class="mud-input-slot" @bind="_form.Title" required maxlength="300" />
             </div>
           </div>
           <div class="mud-input-control ct-wide">
-            <label class="mud-input-label" for="ct-body">Body</label>
+            <label class="mud-input-label" for="ct-body">@L["Body"]</label>
             <div class="mud-input-wrapper">
               <textarea id="ct-body" class="mud-input-slot ct-body" rows="8" @bind="_form.Body"></textarea>
             </div>
-            <div class="mud-input-helper-text">Saved as a draft. Submit it for review from the post's page.</div>
+            <div class="mud-input-helper-text">@L["Saved as a draft. Submit it for review from the post's page."]</div>
           </div>
         </div>
         <div class="ct-row-actions">
-          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || _categories.Count == 0)">Create draft</button>
-          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _form = null">Cancel</button>
+          <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || _categories.Count == 0)">@L["Create draft"]</button>
+          <button type="button" class="mud-button-root mud-button-text mud-button-surface mud-button-medium" @onclick="() => _form = null">@L["Cancel"]</button>
         </div>
       </form>
     </section>
   }
 
   <section class="mud-paper mud-elevation-1 ct-card">
-    <MudTailDataTable @ref="_table" Columns="Columns" OnRowClick="OpenPost" EmptyText="No posts in this view." />
+    <MudTailDataTable @ref="_table" Columns="Columns" OnRowClick="OpenPost" EmptyText="@L["No posts in this view."]" />
   </section>
 </div>
 
@@ -119,15 +118,15 @@
     public string? Body { get; set; }
   }
 
-  private static readonly IReadOnlyList<object> Columns =
+  private IReadOnlyList<object> Columns =>
   [
-    new { key = "id", title = "#", type = "number", width = "80px" },
-    new { key = "title", title = "Title" },
-    new { key = "kind", title = "Kind", type = "enum", options = Enum.GetValues<PostKind>().Select(k => Words(k)).ToArray(), width = "130px" },
-    new { key = "category", title = "Category" },
-    new { key = "state", title = "State", type = "enum", options = Enum.GetValues<PostState>().Select(s => Words(s)).ToArray(), width = "170px" },
-    new { key = "scheduled", title = "Scheduled for" },
-    new { key = "updated", title = "Updated" },
+    new { key = "id", title = L["#"].Value, type = "number", width = "80px" },
+    new { key = "title", title = L["Title"].Value },
+    new { key = "kind", title = L["Kind"].Value, type = "enum", options = Enum.GetValues<PostKind>().Select(k => Words(k)).ToArray(), width = "130px" },
+    new { key = "category", title = L["Category"].Value },
+    new { key = "state", title = L["State"].Value, type = "enum", options = Enum.GetValues<PostState>().Select(s => Words(s)).ToArray(), width = "170px" },
+    new { key = "scheduled", title = L["Scheduled for"].Value },
+    new { key = "updated", title = L["Updated"].Value },
   ];
 
   private MudTailDataTable? _table;
@@ -193,7 +192,7 @@
         Body = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body,
         PostKind = form.Kind,
       });
-      await MudTail.ToastAsync($"Draft #{created.Id} created.", "success");
+      await MudTail.ToastAsync(L["Draft #{0} created.", created.Id], "success");
       _form = null;
     });
     if (ok && created is not null) OpenPost(created.Id.ToString());
