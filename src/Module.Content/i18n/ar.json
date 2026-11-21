@@ -93,5 +93,16 @@
   "your account lacks the content permission for this (content.* in this tenant).": "حسابك لا يملك صلاحية المحتوى لذلك (content.* في هذا المستأجر).",
   "not found, or not visible to you.": "غير موجود، أو غير مرئي لك.",
   "someone changed it meanwhile. Reload and try again.": "عدّله شخص آخر في الأثناء. أعد التحميل وحاول مجددًا.",
-  "The gateway is not reachable ({0}).": "تعذّر الوصول إلى البوابة ({0})."
+  "The gateway is not reachable ({0}).": "تعذّر الوصول إلى البوابة ({0}).",
+  "Translations": "الترجمات",
+  "The content's text in other languages. Readers get the translation of their language, else the content as written. A published post shows a new translation at once.": "نص المحتوى بلغات أخرى. يرى القرّاء ترجمة لغتهم، وإلا فالمحتوى كما كُتب. وإذا كان المنشور منشورًا تظهر الترجمة الجديدة فورًا.",
+  "No translations yet.": "لا توجد ترجمات بعد.",
+  "{0} values · {1} by {2}": "{0} قيمة · {1} بواسطة {2}",
+  "Edit": "تعديل",
+  "Remove": "إزالة",
+  "Language": "اللغة",
+  "Translate": "ترجمة",
+  "Translating needs the Dynamic Fields module (its translate-content dialog).": "تتطلب الترجمة وحدة الحقول الديناميكية (حوار ترجمة المحتوى).",
+  "Translation into {0} saved.": "حُفظت الترجمة إلى {0}.",
+  "Translation removed.": "أُزيلت الترجمة."
 }

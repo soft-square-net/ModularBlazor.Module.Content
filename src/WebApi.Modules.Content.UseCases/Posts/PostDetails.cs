@@ -36,5 +36,6 @@ public sealed class PostDetails(IReadRepository<Post> reader, PostAccess access,
         a.PublishedTitle, a.PublishedBody, a.TransferredFromShift,
         a.History.OrderBy(e => e.At).ThenBy(e => e.Id).Select(e => new PostEventDto(e.At, e.Actor, e.Action, e.State, e.Detail)).ToArray(),
         a.StablePublicId, Permalink(a.StablePublicId), a.SchemaId, a.SchemaVersion,
-        ReadDocument(a.DocumentJson, a.Title, a.Body, $"Post {a.Id} has an invalid document."));
+        ReadDocument(a.DocumentJson, a.Title, a.Body, $"Post {a.Id} has an invalid document."),
+        a.Translations);
 }

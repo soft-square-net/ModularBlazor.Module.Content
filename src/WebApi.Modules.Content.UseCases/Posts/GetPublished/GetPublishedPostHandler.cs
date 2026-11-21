@@ -17,7 +17,11 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
 
         var document = PostDetails.ReadDocument(post.PublishedDocumentJson, post.PublishedTitle ?? post.Title, post.PublishedBody ?? post.Body,
             "The published Post document is invalid.");
+        var translations = post.PublishedTranslations;
+        var served = PostTranslationRules.Chain(query.Culture, translations.Select(t => t.Language));
+        var chain = served.Select(language => translations.First(t => t.Language == language)).ToList();
         return new PublishedPost(post.Id, post.StablePublicId, PostDetails.Permalink(post.StablePublicId), post.PostKind, post.PressId,
-            post.CategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion, document);
+            post.CategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion,
+            PostTranslationRules.Apply(document, chain), translations.Select(t => t.Language).ToList(), served);
     }
 }

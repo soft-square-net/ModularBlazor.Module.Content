@@ -52,6 +52,10 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public string? PublishedBody { get; private set; }
     /// <summary>Immutable document snapshot for the currently published version.</summary>
     public string? PublishedDocumentJson { get; private set; }
+    /// <summary>The document's translations (<see cref="PostTranslation"/> list, JSON): overlays of its text, one per language.</summary>
+    public string TranslationsJson { get; private set; } = "[]";
+    /// <summary>The translations of the published document, taken with it when it is published.</summary>
+    public string? PublishedTranslationsJson { get; private set; }
     /// <summary>Set when unfinished work moved to the next shift's queue at check-out.</summary>
     public string? TransferredFromShift { get; private set; }
 
@@ -117,6 +121,50 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
             State = PostState.AwaitingDeskReapproval;
         });
     }
+
+    public IReadOnlyList<PostTranslation> Translations => ReadTranslations(TranslationsJson);
+    public IReadOnlyList<PostTranslation> PublishedTranslations => ReadTranslations(PublishedTranslationsJson);
+
+    /// <summary>
+    /// Adds or replaces the document's translation into one language (who may is decided by the caller). The workflow
+    /// state does not change: a translation is not an edit of the content. A published Post whose live version is the
+    /// current one gets it live at once; otherwise it goes live with the next publication.
+    /// </summary>
+    public void Translate(string actor, string language,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, TranslatedText>> nodes, DateTimeOffset now)
+    {
+        var document = ReadDocument();
+        PostTranslationRules.Validate(document, language, nodes);
+        var tag = language.Trim();
+        var others = Translations.Where(t => !string.Equals(t.Language, tag, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (others.Count >= PostTranslationRules.MaxLanguages)
+            throw new DomainException($"A Post has at most {PostTranslationRules.MaxLanguages} translations.");
+        var translation = new PostTranslation(tag, nodes, now, actor);
+        Change(actor, "translated", now, () => SetTranslations([.. others, translation]), tag);
+    }
+
+    /// <summary>Removes the translation into one language (live at once when the published version is the current one).</summary>
+    public void RemoveTranslation(string actor, string language, DateTimeOffset now)
+    {
+        var translations = Translations;
+        var kept = translations.Where(t => !string.Equals(t.Language, language?.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+        if (kept.Count == translations.Count) throw new DomainException($"The Post has no '{language}' translation.");
+        Change(actor, "translation removed", now, () => SetTranslations(kept), language.Trim());
+    }
+
+    private void SetTranslations(IReadOnlyList<PostTranslation> translations)
+    {
+        TranslationsJson = JsonSerializer.Serialize(translations, PostJson.Options);
+        if (State == PostState.Published && PublishedDocumentJson == DocumentJson) PublishedTranslationsJson = TranslationsJson;
+    }
+
+    private PostDocument ReadDocument() =>
+        DocumentJson is { Length: > 2 } json
+            ? JsonSerializer.Deserialize<PostDocument>(json, PostJson.Options) ?? PostDocument.FromLegacy(Title, Body)
+            : PostDocument.FromLegacy(Title, Body);
+
+    private static IReadOnlyList<PostTranslation> ReadTranslations(string? json) =>
+        string.IsNullOrWhiteSpace(json) ? [] : JsonSerializer.Deserialize<List<PostTranslation>>(json, PostJson.Options) ?? [];
 
     public void Submit(string actor, DateTimeOffset now)
     {
@@ -233,6 +281,7 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         PublishedTitle = Title;
         PublishedBody = Body;
         PublishedDocumentJson = DocumentJson;
+        PublishedTranslationsJson = TranslationsJson;
     };
 
     private void ClearSchedule()
@@ -256,6 +305,11 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         SchemaId = document.SchemaId.Trim();
         SchemaVersion = document.SchemaVersion;
         DocumentJson = JsonSerializer.Serialize(document, PostJson.Options);
+        // Translations follow the document: values of removed nodes or keys go (stale ones stay, flagged by their hash).
+        var translations = Translations;
+        if (translations.Count > 0)
+            TranslationsJson = JsonSerializer.Serialize(
+                translations.Select(t => PostTranslationRules.Prune(document, t)).OfType<PostTranslation>().ToList(), PostJson.Options);
     }
 
     private void Expect(string action, params PostState[] states)

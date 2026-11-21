@@ -22,6 +22,10 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         post.Property(a => a.SchemaVersion).HasDefaultValue(1);
         post.Property(a => a.DocumentJson).HasDefaultValue("{}");
         post.Property(a => a.PublishedDocumentJson);
+        post.Property(a => a.TranslationsJson).HasDefaultValue("[]");
+        post.Property(a => a.PublishedTranslationsJson);
+        post.Ignore(a => a.Translations);
+        post.Ignore(a => a.PublishedTranslations);
         post.Property(a => a.PublishedTitle).HasMaxLength(300);
         post.Property(a => a.Version).IsConcurrencyToken();
         foreach (var user in new[] { nameof(Post.AcceptedBy), nameof(Post.AssigneeId), nameof(Post.ReviewerId), nameof(Post.ScheduledBy), nameof(Post.PublishedBy) })

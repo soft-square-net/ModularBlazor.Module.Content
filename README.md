@@ -132,6 +132,37 @@ Data stays in the Docker volume
 
 The playground is not in `ModularBlazor.Module.Content.slnx`: CI builds the module without a platform checkout.
 
+To translate posts in the playground, load the DynamicFields module beside Content: build a
+[Module.DynamicFields](https://github.com/soft-square-net/ModularBlazor.Module.DynamicFields) checkout next to this repo
+(or pass `--Playground:DynamicFields=<path>`), then install its starter fields on its Fields page.
+
+```bash
+dotnet run --project playground -- --Playground:DynamicFields=../Module.DynamicFields
+```
+
+## Translations
+
+A post's document is written in one language. Each other language is a **translation overlay** kept with the post:
+per node id (`$root` for the document's root) and content key, the translated text and the hash of the source it was
+translated from. DynamicFields owns the format and its rules; Contents stores and serves it.
+
+| Endpoint | What it does |
+| --- | --- |
+| `PUT /posts/{id}/translations/{language}` `{ version, nodes }` | Adds or replaces one language. Whoever may edit the post now may translate it (owner in their window, the assigned reviewer on shift, Desk). The workflow state does not change |
+| `DELETE /posts/{id}/translations/{language}?version=` | Removes one language |
+| `GET /public/{publicId}?culture=ar-EG` | The published document with its text from the `ar-EG` translation, then `ar`, then its own; `languages` lists what it is translated into, `servedLanguages` what this answer used |
+
+- **Checks:** Contents checks what it can without the field definitions: a language tag, nodes the document has, keys
+  whose source is text, the same shape (text or list of texts), a source hash, 2 MB at most, 20 languages at most.
+  The schema rules (which properties are translatable, their lengths) are DynamicFields' and are checked by its
+  translate dialog before it returns. Modules load in isolated contexts, so Contents does not call it on the server.
+- **Edits:** editing the document drops the translated values of nodes and keys it no longer has. A changed source
+  value keeps its translation; the dialog shows it as stale.
+- **Publishing:** the translations are published with the document. On a published post whose live version is the
+  current one, a translation change is live at once; otherwise it goes live with the next publication.
+- **UI:** the post page lists the translations and opens `Module.DynamicFields/translate-content` to add or edit one,
+  when that dialog is installed.
+
 ## Branches
 
 Trunk-based: `main` always produces an installable bundle; short-lived `feat/...` and `fix/...` branches; a release

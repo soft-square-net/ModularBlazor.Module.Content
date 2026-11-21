@@ -21,6 +21,7 @@ public static class ServiceConfigs
         services.AddScoped<PostAccess>();
         services.AddScoped<PostDetails>();
         services.AddScoped<PostChanges>();
+        services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Translate.PostTranslators>();
 
         services.AddMediatorSourceGen();
         return services;

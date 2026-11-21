@@ -1,5 +1,7 @@
 @page "/contents/posts/{Id:int}"
 @inherits ContentPageBase
+@using System.Globalization
+@inject IModuleDialogs ModuleDialogs
 
 @*
   One post (GET /api/content/posts/{id}): edit it, move it through the workflow (submit, accept, assign, approve,
@@ -131,6 +133,53 @@
     </section>
 
     <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">@L["Translations"]</h2>
+      <p class="mud-typography mud-typography-body2 ct-muted">
+        @L["The content's text in other languages. Readers get the translation of their language, else the content as written. A published post shows a new translation at once."]
+      </p>
+      @if (_post.Translations.Count == 0)
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">@L["No translations yet."]</p>
+      }
+      else
+      {
+        <ul class="ct-translations">
+          @foreach (var t in _post.Translations.OrderBy(t => t.Language))
+          {
+            var language = t.Language;
+            <li>
+              <strong>@LanguageName(language)</strong>
+              <span class="ct-muted">@L["{0} values · {1} by {2}", t.Nodes.Sum(n => n.Value.Count), When(t.UpdatedAt), t.UpdatedBy]</span>
+              @if (CanTranslate)
+              {
+                <button type="button" class="mud-button-root mud-button-text mud-button-primary mud-button-small" disabled="@Busy" @onclick="() => TranslateAsync(language)">@L["Edit"]</button>
+              }
+              <button type="button" class="mud-button-root mud-button-text mud-button-small" disabled="@Busy" @onclick="() => RemoveTranslationAsync(language)">@L["Remove"]</button>
+            </li>
+          }
+        </ul>
+      }
+      @if (CanTranslate)
+      {
+        <div class="ct-row-actions">
+          <div class="mud-input-control ct-inline">
+            <label class="mud-input-label" for="ct-translate-language">@L["Language"]</label>
+            <div class="mud-input-wrapper">
+              <input id="ct-translate-language" class="mud-input-slot" list="ct-languages" maxlength="35" @bind="_language" />
+              <datalist id="ct-languages"><option value="ar">العربية</option><option value="en">English</option></datalist>
+            </div>
+          </div>
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || string.IsNullOrWhiteSpace(_language))"
+                  @onclick="() => TranslateAsync(_language!.Trim())">@L["Translate"]</button>
+        </div>
+      }
+      else
+      {
+        <p class="mud-typography mud-typography-body2 ct-muted">@L["Translating needs the Dynamic Fields module (its translate-content dialog)."]</p>
+      }
+    </section>
+
+    <section class="mud-paper mud-elevation-1 ct-card">
       <h2 class="mud-typography mud-typography-h6">@L["History"]</h2>
       @if (_post.History.Count == 0)
       {
@@ -212,4 +261,65 @@
   }), "Scheduled.");
 
   private Task PublishAsync() => StepAsync((c, v) => c.PublishPostAsync(Id, new VersionRequest { Version = v }), "Published.");
+
+  private const string TranslateDialog = "Module.DynamicFields/translate-content";
+  private string? _language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar" ? "en" : "ar";
+
+  private bool CanTranslate => ModuleDialogs.IsAvailable(TranslateDialog);
+
+  /// <summary>
+  /// Opens DynamicFields' translate dialog on the post's document (its root and nodes, as content nodes) with the
+  /// existing translation, and keeps what it returns (already checked against the fields).
+  /// </summary>
+  private async Task TranslateAsync(string language)
+  {
+    if (_post is null || !IsLanguage(language)) return;
+    var existing = _post.Translations.FirstOrDefault(t => string.Equals(t.Language, language, StringComparison.OrdinalIgnoreCase));
+    var root = new
+    {
+      field = _post.Document.SchemaId,
+      fieldVersion = _post.Document.SchemaVersion,
+      content = _post.Document.Content,
+      style = _post.Document.Style,
+      children = _post.Document.Children.Select(ToNode).ToList()
+    };
+    var result = await ModuleDialogs.ShowAsync(TranslateDialog, new
+    {
+      root,
+      language = existing?.Language ?? language,
+      translation = existing is null ? null : new { language = existing.Language, nodes = existing.Nodes }
+    });
+    if (result.Canceled || result.As<Overlay>() is not { } overlay) return;
+    var version = _post.Version;
+    await RunAsync(async () =>
+    {
+      Show(await Content.TranslatePostAsync(Id, overlay.Language ?? language, new PostTranslationEdit { Version = version, Nodes = overlay.Nodes ?? new Dictionary<string, IDictionary<string, TranslatedText>>() }));
+      await MudTail.ToastAsync(L["Translation into {0} saved.", LanguageName(overlay.Language ?? language)], "success");
+    });
+  }
+
+  private Task RemoveTranslationAsync(string language) =>
+    StepAsync((c, v) => c.RemovePostTranslationAsync(Id, language, v), "Translation removed.");
+
+  /// <summary>What the translate dialog returns.</summary>
+  private sealed record Overlay(string? Language, Dictionary<string, IDictionary<string, TranslatedText>>? Nodes);
+
+  private static object ToNode(PostNode node) => new
+  {
+    nodeId = node.NodeId,
+    field = node.SchemaId,
+    fieldVersion = node.SchemaVersion,
+    content = node.Content,
+    style = node.Style,
+    children = node.Children.Select(ToNode).ToList()
+  };
+
+  private static bool IsLanguage(string? tag) =>
+    tag is { Length: > 0 and <= 35 } && System.Text.RegularExpressions.Regex.IsMatch(tag, "^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$");
+
+  private static string LanguageName(string language)
+  {
+    try { return $"{CultureInfo.GetCultureInfo(language).NativeName} ({language})"; }
+    catch (CultureNotFoundException) { return language; }
+  }
 }

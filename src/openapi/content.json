@@ -137,6 +137,13 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "culture",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -646,6 +653,103 @@
         }
       }
     },
+    "/api/content/posts/{id}/translations/{language}": {
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "operationId": "Content_TranslatePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "language",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostTranslationEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Content"
+        ],
+        "operationId": "Content_RemovePostTranslation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "language",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/content/automation/accepted": {
       "get": {
         "tags": [
@@ -865,7 +969,8 @@
           "permalink",
           "schemaId",
           "schemaVersion",
-          "document"
+          "document",
+          "translations"
         ],
         "type": "object",
         "properties": {
@@ -1018,6 +1123,12 @@
           },
           "document": {
             "$ref": "#/components/schemas/PostDocument"
+          },
+          "translations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostTranslation"
+            }
           }
         }
       },
@@ -1271,6 +1382,58 @@
           }
         }
       },
+      "PostTranslation": {
+        "required": [
+          "language",
+          "nodes",
+          "updatedAt",
+          "updatedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "nodes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/components/schemas/TranslatedText"
+              }
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "PostTranslationEdit": {
+        "required": [
+          "version",
+          "nodes"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "nodes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/components/schemas/TranslatedText"
+              }
+            }
+          }
+        }
+      },
       "PostView": {
         "enum": [
           "Mine",
@@ -1307,7 +1470,9 @@
           "publishedAt",
           "schemaId",
           "schemaVersion",
-          "document"
+          "document",
+          "languages",
+          "servedLanguages"
         ],
         "type": "object",
         "properties": {
@@ -1346,6 +1511,18 @@
           },
           "document": {
             "$ref": "#/components/schemas/PostDocument"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "servedLanguages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -1401,6 +1578,21 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "TranslatedText": {
+        "required": [
+          "value",
+          "sourceHash"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "sourceHash": {
+            "type": "string"
           }
         }
       },

@@ -87,6 +87,25 @@ if (mode == "dev")
     webApi.WithEnvironment("Modules__Local__content", Metadata("ModuleOutput"))
         .WithEnvironment(ClientLocal + "WebApi.Modules.Content.Client", Metadata("ApiClientOutput"))
         .WithEnvironment(ClientLocal + "Module.Content", Metadata("UiOutput"));
+
+    // Optional: the DynamicFields module beside it, from a built Module.DynamicFields checkout (Playground:DynamicFields,
+    // default ../Module.DynamicFields next to this repo), so a post's text can be translated with its translate-content
+    // dialog. Without it the post page says translating needs that module.
+    var fields = Path.GetFullPath(builder.Configuration["Playground:DynamicFields"] ?? Path.Combine(Metadata("RepoRoot"), "..", "Module.DynamicFields"));
+    var fieldsWeb = Path.Combine(fields, "src", "WebApi.Modules.DynamicFields.Web", "bin", "Debug", "net10.0");
+    var fieldsApiClient = Path.Combine(fields, "src", "WebApi.Modules.DynamicFields.Client", "bin", "Debug", "net10.0", "soft.square.net.WebApi.Modules.DynamicFields.Client.dll");
+    var fieldsUi = Path.Combine(fields, "src", "Module.DynamicFields", "bin", "Debug", "net10.0", "soft.square.net.Module.DynamicFields.dll");
+    if (File.Exists(Path.Combine(fieldsWeb, "soft.square.net.WebApi.Modules.DynamicFields.Web.dll")) && File.Exists(fieldsApiClient) && File.Exists(fieldsUi))
+    {
+        Console.WriteLine($"DynamicFields: loading the module built in {fields}.");
+        webApi.WithEnvironment("Modules__Local__dynamicfields", fieldsWeb + Path.DirectorySeparatorChar)
+            .WithEnvironment(ClientLocal + "WebApi.Modules.DynamicFields.Client", fieldsApiClient)
+            .WithEnvironment(ClientLocal + "Module.DynamicFields", fieldsUi)
+            .WithEnvironment("Access__DevGrants__0__Permissions__1", "dynamicfields.*")
+            .WithEnvironment("Access__DevGrants__1__Permissions__1", "dynamicfields.read");
+    }
+    else if (builder.Configuration["Playground:DynamicFields"] is not null)
+        Console.WriteLine($"DynamicFields: no Debug build in {fields}; build it (dotnet build) to load it beside Content.");
 }
 
 builder.AddProject<Projects.ModularBlazor_BlzWebClient>("blzwebclient", launchProfileName: null)

@@ -9,7 +9,7 @@ public sealed record PostDetail(int Id, PostKind PostKind, string PressId, strin
     string? AssigneeId, string? AssignedShiftId, string? ReviewerId, DateTimeOffset? ScheduledFor, string? ScheduledBy,
     DateTimeOffset? PublishedAt, string? PublishedBy, string? PublishedTitle, string? PublishedBody,
     string? TransferredFromShift, IReadOnlyList<PostEventDto> History, string PublicId, string Permalink,
-    string SchemaId, int SchemaVersion, PostDocument Document);
+    string SchemaId, int SchemaVersion, PostDocument Document, IReadOnlyList<PostTranslation> Translations);
 
 /// <summary>One entry of <see cref="PostDetail.History"/>.</summary>
 public sealed record PostEventDto(DateTimeOffset At, string Actor, string Action, PostState State, string? Detail);

@@ -134,6 +134,9 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasMaxLength(300)
                         .HasColumnType("varchar(300)");
 
+                    b.Property<string>("PublishedTranslationsJson")
+                        .HasColumnType("longtext");
+
                     b.Property<string>("ReviewerId")
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
@@ -181,6 +184,12 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.Property<string>("TransferredFromShift")
                         .HasMaxLength(64)
                         .HasColumnType("varchar(64)");
+
+                    b.Property<string>("TranslationsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("longtext")
+                        .HasDefaultValue("[]");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)");

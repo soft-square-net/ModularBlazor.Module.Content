@@ -53,6 +53,8 @@ public sealed class ContentRoutes : ICarterModule
         Post<Posts.Schedule>(posts, segment, documented);
         Post<Posts.Publish>(posts, segment, documented);
         Post<Posts.PublishDue>(posts, segment, documented);
+        Post<Posts.Translate>(posts, segment, documented);
+        Post<Posts.RemoveTranslation>(posts, segment, documented);
     }
 
     private static void Post<TEndpoint>(RouteGroupBuilder posts, string segment, bool documented) where TEndpoint : IPostEndpoint
