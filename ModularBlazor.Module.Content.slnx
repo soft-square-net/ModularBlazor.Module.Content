@@ -1,9 +1,14 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/WebApi.Modules.Content.Core/WebApi.Modules.Content.Core.csproj" />
+    <Project Path="src/WebApi.Modules.Content.UseCases/WebApi.Modules.Content.UseCases.csproj" />
+    <Project Path="src/WebApi.Modules.Content.Infrastructure/WebApi.Modules.Content.Infrastructure.csproj" />
+    <Project Path="src/WebApi.Modules.Content.Web/WebApi.Modules.Content.Web.csproj" />
+    <Project Path="src/WebApi.Modules.Content.Client/WebApi.Modules.Content.Client.csproj" />
     <Project Path="src/Module.Content/Module.Content.csproj" />
   </Folder>
-  <Project Path="src/WebApi.Modules.Content.Application/WebApi.Modules.Content.Application.csproj" />
-  <Project Path="src/WebApi.Modules.Content.Client/WebApi.Modules.Content.Client.csproj" />
-  <Project Path="src/WebApi.Modules.Content.Domain/WebApi.Modules.Content.Domain.csproj" />
-  <Project Path="src/WebApi.Modules.Content.Infrastructure/WebApi.Modules.Content.Infrastructure.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/WebApi.Modules.Content.UnitTests/WebApi.Modules.Content.UnitTests.csproj" />
+    <Project Path="tests/WebApi.Modules.Content.IntegrationTests/WebApi.Modules.Content.IntegrationTests.csproj" />
+  </Folder>
 </Solution>
