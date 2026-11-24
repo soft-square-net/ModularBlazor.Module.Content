@@ -9,14 +9,13 @@
   may, from your content permissions and your shift. Every step sends the version you see (409 if it changed).
 *@
 
-<PageTitle>@L["Post {0}", Id]</PageTitle>
+<PageHeader Title="@(_post?.Title ?? L["Post {0}", Id])" />
 
 <div class="mud-container ct-page">
   <a href="contents" class="mud-button-root mud-button-text mud-button-primary mud-button-small ct-back">@L["← Contents Management"]</a>
 
   <header class="ct-header">
     <div>
-      <h1 class="mud-typography mud-typography-h4">@(_post?.Title ?? L["Post {0}", Id])</h1>
       @if (_post is not null)
       {
         <p class="mud-typography mud-typography-body1 ct-muted">
