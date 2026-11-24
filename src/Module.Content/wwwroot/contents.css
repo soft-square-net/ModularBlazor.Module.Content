@@ -1,5 +1,5 @@
 /* Module.Content (Contents Management): layout around MudTail's components. Colours come from the --mud-palette-*
-   tokens of Layouts.Default. */
+   tokens of UI.MudTail. */
 .ct-page { padding-block: 8px 32px; }
 .ct-header { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
 .ct-header h1 { margin: 0 0 4px; }
