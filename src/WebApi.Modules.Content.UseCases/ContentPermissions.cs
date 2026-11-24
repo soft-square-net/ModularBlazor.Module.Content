@@ -18,6 +18,10 @@ public static class ContentPermissions
     public const string Publish = "content.publish";
     /// <summary>Presses and categories.</summary>
     public const string Manage = "content.manage";
+    /// <summary>Read the change feed of the whole tenant (workflow services: Elsa).</summary>
+    public const string Events = "content.events";
+    /// <summary>Publish the content pipeline (Elsa, or an admin), tenant-wide.</summary>
+    public const string Pipeline = "content.pipeline";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -29,6 +33,8 @@ public static class ContentPermissions
         new(Return, "Send a Post back to its author (shift Manager, Desk)."),
         new(Review, "Edit and approve Posts assigned to you (shift Editor)."),
         new(Publish, "Schedule and publish approved Posts (shift Desk)."),
-        new(Manage, "Manage presses and categories.")
+        new(Manage, "Manage presses and categories."),
+        new(Events, "Read the change feed of posts and contents (workflow services), tenant-wide."),
+        new(Pipeline, "Publish the content pipeline: stages and actions (workflow services, admins), tenant-wide.")
     ];
 }

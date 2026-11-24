@@ -5,6 +5,9 @@ Content: newsroom posts (article, news, video, reportage and other post kinds), 
 > **Status: moved in.** The code moved here from the platform repo and builds against the platform packages.
 > Nothing here is packed as a bundle yet: build it and upload the entry project's output in the admin area.
 
+A post is a document composed of **shared contents** that sections work on and the Desk reviews, through a pipeline
+stored as data; see [docs/shared-contents.md](docs/shared-contents.md).
+
 ## Layout
 
 The server part follows [Ardalis Clean Architecture](https://github.com/ardalis/CleanArchitecture), adapted to a

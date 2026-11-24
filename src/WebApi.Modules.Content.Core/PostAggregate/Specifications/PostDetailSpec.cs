@@ -3,5 +3,5 @@ namespace soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specificatio
 /// <summary>The Post with its history, untracked (for reading).</summary>
 public sealed class PostDetailSpec : SingleResultSpecification<Post>
 {
-    public PostDetailSpec(int id) => Query.Where(a => a.Id == id).Include(a => a.History).AsNoTracking();
+    public PostDetailSpec(int id) => Query.Where(a => a.Id == id).Include(a => a.History).Include(a => a.ContentLinks).Include(a => a.Slugs).AsNoTracking();
 }

@@ -2,7 +2,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using soft.square.net.WebApi.Modules.Content.Infrastructure;
 using soft.square.net.WebApi.Modules.Content.UseCases;
+using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
+using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
+using soft.square.net.WebApi.SharedKernel;
 
 namespace soft.square.net.WebApi.Modules.Content.Web.Configurations;
 
@@ -22,6 +25,20 @@ public static class ServiceConfigs
         services.AddScoped<PostDetails>();
         services.AddScoped<PostChanges>();
         services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Translate.PostTranslators>();
+        services.AddScoped<PostEditors>();
+        services.AddScoped<DeskPublishing>();
+        services.AddScoped<PostContentEditing>();
+
+        // Shared contents, the pipeline and the change feed.
+        services.AddScoped<ContentPipelines>();
+        services.AddScoped<ContentAccess>();
+        services.AddScoped<ContentDetails>();
+        services.AddScoped<ContentChanges>();
+        services.AddScoped<PostContents>();
+        services.AddScoped<PostDocumentSplit>();
+        services.AddScoped<FeedReader>();
+        services.AddScoped<IDomainEventHandler<FeedEvent>, FeedWriter>(); // first: the outbox row, then the effects
+        services.AddScoped<IDomainEventHandler<FeedEvent>, RecomposePostsOnContentChange>();
 
         services.AddMediatorSourceGen();
         return services;
