@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebApi.Modules.Content.Core\WebApi.Modules.Content.Core.csproj" />
+    <!-- The ports it implements (IContentStore). -->
+    <ProjectReference Include="..\WebApi.Modules.Content.UseCases\WebApi.Modules.Content.UseCases.csproj" />
   </ItemGroup>
 
 </Project>

@@ -39,5 +39,12 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         post.HasIndex(a => a.PublicId).IsUnique();
         post.HasMany(a => a.History).WithOne().HasForeignKey("ArticleId").OnDelete(DeleteBehavior.Cascade);
         post.Navigation(a => a.History).UsePropertyAccessMode(PropertyAccessMode.Field);
+        post.HasMany(a => a.ContentLinks).WithOne().HasForeignKey(c => c.PostId).OnDelete(DeleteBehavior.Cascade);
+        post.Navigation(a => a.ContentLinks).UsePropertyAccessMode(PropertyAccessMode.Field).HasField("_contents");
+        post.HasMany(a => a.Slugs).WithOne().HasForeignKey(s => s.PostId).OnDelete(DeleteBehavior.Cascade);
+        post.Navigation(a => a.Slugs).UsePropertyAccessMode(PropertyAccessMode.Field);
+        post.Ignore(a => a.Contents);
+        post.Ignore(a => a.Root);
+        // Rows that predate the split get false from the migration (the backfill then splits them); new rows are written true.
     }
 }

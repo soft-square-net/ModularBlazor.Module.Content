@@ -19,7 +19,7 @@ public sealed class ContentModule : IRuntimeModule
     public ModuleManifest Manifest { get; } = new("content", "Content", "0.1.0", "content")
     {
         Description = "Newsroom posts (article, news, video, reportage, and other post kinds), taxonomy, review and publishing workflow.",
-        DefaultSettings = new Dictionary<string, string?> { ["Content:OwnerEditWindow"] = "1.00:00:00" },
+        DefaultSettings = new Dictionary<string, string?> { ["Content:OwnerEditWindow"] = "1.00:00:00", ["Content:EventDelay"] = "00:00:02" },
         Permissions = ContentPermissions.All
     };
 

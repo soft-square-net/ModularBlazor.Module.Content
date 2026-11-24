@@ -23,6 +23,15 @@ public static class PostDocumentRules
             throw new DomainException("The Post document exceeds the 2 MB limit.");
     }
 
+    /// <summary>One node and what it holds on its own (a shared content): the same limits as inside a document.</summary>
+    public static void Validate(PostNode node)
+    {
+        var count = 0;
+        ValidateNode(node, 1, new HashSet<string>(StringComparer.Ordinal), ref count);
+        if (JsonSerializer.SerializeToUtf8Bytes(node, PostJson.Options).Length > MaxJsonBytes)
+            throw new DomainException("A content exceeds the 2 MB limit.");
+    }
+
     private static void ValidateNode(PostNode node, int depth, HashSet<string> ids, ref int count)
     {
         if (++count > MaxNodes) throw new DomainException($"A Post can contain at most {MaxNodes} nested nodes.");

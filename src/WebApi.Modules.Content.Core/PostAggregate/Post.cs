@@ -1,16 +1,26 @@
 using System.Text.Json;
 using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
+using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 
 namespace soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 
 /// <summary>
-/// A Post of one press and category (aggregate root). The aggregate enforces the state rules; who may call each
-/// operation (grants, scopes, shifts) is decided in the application layer. Every change bumps <see cref="Version"/>
-/// (optimistic concurrency: the second of two racing assignments gets a conflict) and is recorded in <see cref="History"/>.
+/// A Post of one press and category (aggregate root): a document with a URL. The aggregate enforces the state rules; who
+/// may call each operation (grants, scopes, shifts) is decided in the application layer. Every change bumps
+/// <see cref="Version"/> (optimistic concurrency: the second of two racing assignments gets a conflict) and is recorded in
+/// <see cref="History"/>.
+/// <para>Its kind is <see cref="SchemaId"/>/<see cref="SchemaVersion"/> (a DynamicFields root field). It holds its root values
+/// and the ordered references to shared contents (<see cref="Contents"/>, <c>ContentItem</c> aggregates), each pinned to the
+/// Desk-accepted revision it went live with. <see cref="DocumentJson"/> is the working document assembled from the root
+/// values and the contents' current revisions (kept up to date by the application layer, <see cref="Recompose"/>);
+/// <see cref="PublishedDocumentJson"/> is assembled from the pinned revisions at publication.</para>
 /// </summary>
 public sealed class Post : AggregateRoot<int>, ITenantOwned
 {
     private readonly List<PostEvent> _history = [];
+    private readonly List<PostContent> _contents = [];
+    private readonly List<PostSlug> _slugs = [];
+    private readonly List<(string Type, Guid? ContentId, string? Detail)> _feed = [];
 
     private Post() { } // EF Core
 
@@ -59,19 +69,33 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// <summary>Set when unfinished work moved to the next shift's queue at check-out.</summary>
     public string? TransferredFromShift { get; private set; }
 
+    /// <summary>False until the migration has made shared contents of the stored document's children.</summary>
+    public bool ContentsSplit { get; private set; } = true;
+
     public IReadOnlyList<PostEvent> History => _history;
+
+    /// <summary>The most contents one post uses.</summary>
+    public const int MaxContents = 500;
+    /// <summary>The contents it uses, in reading order.</summary>
+    public IReadOnlyList<PostContent> Contents => _contents.OrderBy(c => c.Order).ToList();
+    /// <summary>The same references as stored (the mapped navigation; unordered).</summary>
+    public IReadOnlyList<PostContent> ContentLinks => _contents;
+    public IReadOnlyList<PostSlug> Slugs => _slugs;
 
     /// <summary>The grant scopes of this Post: its press and its category.</summary>
     public IReadOnlyCollection<string> Scopes => [$"press:{PressId}", $"category:{CategoryId}"];
 
+    /// <summary>A new public id (a new post's contents are made before it, and name it as their origin).</summary>
+    public static string NewPublicId() => Guid.NewGuid().ToString("N");
+
     public static Post Create(string ownerId, Category category, string title, string body, DateTimeOffset now, PostKind postKind = PostKind.Article,
-        PostDocument? document = null)
+        PostDocument? document = null, IReadOnlyList<ContentRef>? contents = null, string? publicId = null)
     {
         if (!Enum.IsDefined(postKind)) throw new DomainException($"Unsupported postKind '{postKind}'.");
         var post = new Post
         {
             OwnerId = Require(ownerId, "an owner"),
-            PublicId = Guid.NewGuid().ToString("N"),
+            PublicId = publicId ?? NewPublicId(),
             PressId = category.PressId,
             CategoryId = category.Id,
             PostKind = postKind,
@@ -80,8 +104,11 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
             UpdatedAt = now
         };
         post.SetText(title, body);
+        if (contents is not null) post.SetContents(contents);
         post.SetDocument(document ?? PostDocument.FromLegacy(title, body));
         post.Record(ownerId, "created", now, $"{category.PressId}/{category.Id}");
+        // A new post has no id until it is saved, so it raises no feed events: its contents' "created" events carry it.
+        post._feed.Clear();
         return post;
     }
 
@@ -90,37 +117,96 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         State is PostState.Draft or PostState.Returned
         || (State == PostState.Submitted && SubmittedAt is { } submitted && now < submitted + editWindow);
 
-    public void EditByOwner(string actor, string title, string body, DateTimeOffset now, TimeSpan editWindow, PostDocument? document = null)
-    {
-        if (actor != OwnerId) throw new DomainException("Only the owner edits through this path.");
-        if (!OwnerMayEdit(now, editWindow))
-            throw new DomainException(State == PostState.Submitted
-                ? "The edit window after submission has closed; the Post is locked until review sends it back."
-                : $"The owner cannot edit a Post that is {State}.");
-        Change(actor, "edited", now, () => { SetText(title, body); if (document is not null) SetDocument(document); });
-    }
+    public void EditByOwner(string actor, string title, string body, DateTimeOffset now, TimeSpan editWindow, PostDocument? document = null) =>
+        Edit(PostEditor.Owner, actor, now, editWindow, new PostChange(title, body, document));
 
     /// <summary>The assigned reviewer edits during review (the caller has checked the reviewer's shift grant).</summary>
-    public void EditInReview(string actor, string title, string body, DateTimeOffset now, PostDocument? document = null)
-    {
-        if (State != PostState.InReview || AssigneeId != actor) throw new DomainException("Only the assigned reviewer edits a Post in review.");
-        Change(actor, "edited in review", now, () => { SetText(title, body); if (document is not null) SetDocument(document); });
-    }
+    public void EditInReview(string actor, string title, string body, DateTimeOffset now, PostDocument? document = null) =>
+        Edit(PostEditor.Reviewer, actor, now, TimeSpan.Zero, new PostChange(title, body, document));
 
     /// <summary>Desk edits an approved or scheduled Post: any schedule is cancelled and Desk must re-approve.</summary>
-    public void EditByDesk(string actor, string title, string body, DateTimeOffset now, PostDocument? document = null)
+    public void EditByDesk(string actor, string title, string body, DateTimeOffset now, PostDocument? document = null) =>
+        Edit(PostEditor.Desk, actor, now, TimeSpan.Zero, new PostChange(title, body, document));
+
+    /// <summary>The editor role the post's state gives <paramref name="actor"/> now, if any (the caller checks the grants).</summary>
+    public PostEditor? EditorRole(string actor, DateTimeOffset now, TimeSpan editWindow) =>
+        actor == OwnerId && OwnerMayEdit(now, editWindow) ? PostEditor.Owner
+        : State == PostState.InReview && AssigneeId == actor ? PostEditor.Reviewer
+        : State is PostState.Approved or PostState.Scheduled or PostState.AwaitingDeskReapproval or PostState.Published ? PostEditor.Desk
+        : null;
+
+    /// <summary>
+    /// Edits the post as its owner (draft, returned, or submitted within the edit window), its assigned reviewer (in review)
+    /// or Desk (approved, scheduled, awaiting re-approval or published: any schedule is cancelled and Desk must re-approve;
+    /// the live snapshot stays). The edit may change the text, the document (root values and assembled contents), the
+    /// contents and their order, and the slugs.
+    /// </summary>
+    public void Edit(PostEditor editor, string actor, DateTimeOffset now, TimeSpan editWindow, PostChange edit)
     {
-        if (State is not (PostState.Approved or PostState.Scheduled or PostState.AwaitingDeskReapproval or PostState.Published))
-            throw new DomainException($"Desk edits approved or scheduled Posts, not {State} ones.");
-        Change(actor, State == PostState.Scheduled ? "edited; schedule cancelled" : State == PostState.Published
-            ? "edited after publication; live version retained" : "edited by desk", now, () =>
+        string action;
+        switch (editor)
         {
-            SetText(title, body);
-            if (document is not null) SetDocument(document);
-            ClearSchedule();
-            State = PostState.AwaitingDeskReapproval;
+            case PostEditor.Owner:
+                if (actor != OwnerId) throw new DomainException("Only the owner edits through this path.");
+                if (!OwnerMayEdit(now, editWindow))
+                    throw new DomainException(State == PostState.Submitted
+                        ? "The edit window after submission has closed; the Post is locked until review sends it back."
+                        : $"The owner cannot edit a Post that is {State}.");
+                action = "edited";
+                break;
+            case PostEditor.Reviewer:
+                if (State != PostState.InReview || AssigneeId != actor) throw new DomainException("Only the assigned reviewer edits a Post in review.");
+                action = "edited in review";
+                break;
+            case PostEditor.Desk:
+                if (State is not (PostState.Approved or PostState.Scheduled or PostState.AwaitingDeskReapproval or PostState.Published))
+                    throw new DomainException($"Desk edits approved or scheduled Posts, not {State} ones.");
+                action = State == PostState.Scheduled ? "edited; schedule cancelled" : State == PostState.Published
+                    ? "edited after publication; live version retained" : "edited by desk";
+                break;
+            default:
+                throw new DomainException($"Unknown editor '{editor}'.");
+        }
+        Change(actor, action, now, () =>
+        {
+            if (edit.Title is not null) SetText(edit.Title, edit.Body ?? Body);
+            else if (edit.Body is not null) Body = edit.Body;
+            if (edit.Contents is not null) SetContents(edit.Contents);
+            if (edit.Slugs is not null) SetSlugs(edit.Slugs);
+            if (edit.Document is not null) SetDocument(edit.Document);
+            if (editor == PostEditor.Desk)
+            {
+                ClearSchedule();
+                State = PostState.AwaitingDeskReapproval;
+            }
+            _feed.Add((FeedEventTypes.PostChanged, null, action));
         });
     }
+
+    /// <summary>
+    /// Refreshes the working document after one of its contents changed (no new version: the post itself did not change).
+    /// The document's children must be the post's contents, in order.
+    /// </summary>
+    public void Recompose(PostDocument working) => SetDocument(working);
+
+    /// <summary>The root of the working document: kind and root values, without the contents.</summary>
+    public PostDocument Root => ReadDocument() with { Children = [] };
+
+    /// <summary>
+    /// The migration's split of a stored document: the post now uses these contents (made from its children, in order,
+    /// pinned to their first revision when <paramref name="pinned"/>). No new version and no feed events.
+    /// </summary>
+    public void CompleteSplit(IReadOnlyList<Guid> contents, bool pinned)
+    {
+        if (ContentsSplit) return;
+        _contents.Clear();
+        for (var i = 0; i < contents.Count; i++)
+            _contents.Add(new PostContent(contents[i], i, required: true) { PinnedRevision = pinned ? 1 : null });
+        ContentsSplit = true;
+    }
+
+    /// <summary>For the migration's tests and fixtures: marks a post as stored before the split.</summary>
+    public void MarkUnsplit() => ContentsSplit = false;
 
     public IReadOnlyList<PostTranslation> Translations => ReadTranslations(TranslationsJson);
     public IReadOnlyList<PostTranslation> PublishedTranslations => ReadTranslations(PublishedTranslationsJson);
@@ -242,13 +328,18 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         }, fromShift);
     }
 
-    /// <summary>Desk schedules the current version; any later edit cancels the schedule.</summary>
-    public void Schedule(string actor, DateTimeOffset publishAt, DateTimeOffset now)
+    /// <summary>
+    /// Desk schedules the current version; any later edit cancels the schedule. A post with contents pins each required
+    /// one to its accepted revision (<paramref name="pins"/>); the due publication assembles the document from them.
+    /// </summary>
+    public void Schedule(string actor, DateTimeOffset publishAt, DateTimeOffset now, IReadOnlyDictionary<Guid, int>? pins = null)
     {
         Expect("schedule", PostState.Approved, PostState.AwaitingDeskReapproval, PostState.Scheduled);
         if (publishAt <= now) throw new DomainException("A scheduled publish time must be in the future.");
+        var pinned = RequirePins(pins);
         Change(actor, "scheduled", now, () =>
         {
+            Pin(pinned);
             State = PostState.Scheduled;
             ScheduledFor = publishAt;
             ScheduledBy = actor;
@@ -256,39 +347,119 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         }, publishAt.ToString("O"));
     }
 
-    public void Publish(string actor, DateTimeOffset now)
+    /// <summary>
+    /// Desk publishes now. A post with contents needs the <paramref name="plan"/>: every required content pinned to an accepted
+    /// revision, and the document assembled from the pinned revisions.
+    /// </summary>
+    public void Publish(string actor, DateTimeOffset now, PublishPlan? plan = null)
     {
         Expect("publish", PostState.Approved, PostState.AwaitingDeskReapproval, PostState.Scheduled);
-        Change(actor, "published", now, MarkPublished(actor, now));
+        var pinned = RequirePins(plan?.Pins);
+        var document = PublishedDocument(plan?.Document);
+        Change(actor, "published", now, () => { Pin(pinned); MarkPublished(actor, now, document)(); });
     }
 
     /// <summary>
     /// Publishes a scheduled Post whose time has come, if it is still the version Desk scheduled (its right was
     /// checked when it was scheduled). False when nothing is due.
     /// </summary>
-    public bool PublishIfDue(string actor, DateTimeOffset now)
+    public bool PublishIfDue(string actor, DateTimeOffset now, PostDocument? pinnedDocument = null)
     {
-        if (State != PostState.Scheduled || ScheduledFor is not { } due || due > now || ScheduledVersion != Version) return false;
-        Change(actor, "published (scheduled)", now, MarkPublished(ScheduledBy ?? actor, now), $"scheduled by {ScheduledBy}");
+        if (!IsDue(now)) return false;
+        var document = PublishedDocument(pinnedDocument);
+        Change(actor, "published (scheduled)", now, MarkPublished(ScheduledBy ?? actor, now, document), $"scheduled by {ScheduledBy}");
         return true;
     }
 
-    private Action MarkPublished(string publisher, DateTimeOffset now) => () =>
+    /// <summary>Scheduled, due, and unchanged since Desk scheduled it.</summary>
+    public bool IsDue(DateTimeOffset now) =>
+        State == PostState.Scheduled && ScheduledFor is { } due && due <= now && ScheduledVersion == Version;
+
+    private Action MarkPublished(string publisher, DateTimeOffset now, string document) => () =>
     {
         State = PostState.Published;
         PublishedAt = now;
         PublishedBy = publisher;
         PublishedTitle = Title;
         PublishedBody = Body;
-        PublishedDocumentJson = DocumentJson;
+        PublishedDocumentJson = document;
         PublishedTranslationsJson = TranslationsJson;
     };
+
+    /// <summary>The document a publication goes live with: assembled from the pinned revisions, or the working one without contents.</summary>
+    private string PublishedDocument(PostDocument? assembled)
+    {
+        if (assembled is null)
+            return _contents.Count == 0 ? DocumentJson : throw new DomainException("A Post with contents is published from its accepted contents.");
+        PostDocumentRules.Validate(assembled);
+        return JsonSerializer.Serialize(assembled, PostJson.Options);
+    }
+
+    /// <summary>Checks that every required content has an accepted revision to pin; optional ones without one are left out.</summary>
+    private IReadOnlyDictionary<Guid, int> RequirePins(IReadOnlyDictionary<Guid, int>? pins)
+    {
+        pins ??= new Dictionary<Guid, int>();
+        var missing = _contents.Count(c => c.Required && !pins.ContainsKey(c.ContentId));
+        if (missing > 0)
+            throw new DomainException(missing == 1
+                ? "A required content of this Post is not accepted yet."
+                : $"{missing} required contents of this Post are not accepted yet.");
+        return pins;
+    }
+
+    private void Pin(IReadOnlyDictionary<Guid, int> pins)
+    {
+        foreach (var content in _contents) content.PinnedRevision = pins.TryGetValue(content.ContentId, out var revision) ? revision : null;
+    }
 
     private void ClearSchedule()
     {
         ScheduledFor = null;
         ScheduledBy = null;
         ScheduledVersion = null;
+    }
+
+    private void SetContents(IReadOnlyList<ContentRef> contents)
+    {
+        if (contents.Select(c => c.ContentId).Distinct().Count() != contents.Count) throw new DomainException("A Post uses a content once.");
+        if (contents.Count > MaxContents) throw new DomainException($"A Post uses at most {MaxContents} contents.");
+        foreach (var gone in _contents.Where(c => contents.All(n => n.ContentId != c.ContentId)).ToList())
+        {
+            _contents.Remove(gone);
+            _feed.Add((FeedEventTypes.ContentDetached, gone.ContentId, null));
+        }
+        for (var i = 0; i < contents.Count; i++)
+        {
+            var wanted = contents[i];
+            var existing = _contents.FirstOrDefault(c => c.ContentId == wanted.ContentId);
+            if (existing is null)
+            {
+                _contents.Add(new PostContent(wanted.ContentId, i, wanted.Required));
+                _feed.Add((FeedEventTypes.ContentAttached, wanted.ContentId, null));
+            }
+            else
+            {
+                existing.Order = i;
+                existing.Required = wanted.Required;
+            }
+        }
+    }
+
+    private void SetSlugs(IReadOnlyDictionary<string, string> slugs)
+    {
+        if (slugs.Count > PostSlug.MaxCultures) throw new DomainException($"A Post has slugs in at most {PostSlug.MaxCultures} cultures.");
+        foreach (var (culture, slug) in slugs)
+        {
+            if (!PostTranslationRules.IsLanguage(culture)) throw new DomainException($"'{culture}' is not a culture such as ar, en or en-GB.");
+            if (!PostSlug.IsSlug(slug))
+                throw new DomainException($"'{slug}' is not a slug: lowercase letters, digits and single '-' (at most {PostSlug.MaxLength}).");
+        }
+        _slugs.RemoveAll(s => !slugs.Keys.Any(k => string.Equals(k.Trim(), s.Culture, StringComparison.OrdinalIgnoreCase)));
+        foreach (var (culture, slug) in slugs)
+        {
+            if (_slugs.FirstOrDefault(s => string.Equals(s.Culture, culture.Trim(), StringComparison.OrdinalIgnoreCase)) is { } existing) existing.Slug = slug;
+            else _slugs.Add(new PostSlug(culture.Trim(), slug));
+        }
     }
 
     private void SetText(string title, string body)
@@ -319,10 +490,16 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
 
     private void Change(string actor, string action, DateTimeOffset now, Action apply, string? detail = null)
     {
+        var before = State;
+        _feed.Clear();
         apply();
         Version++;
         UpdatedAt = now;
         Record(actor, action, now, detail);
+        if (State != before) _feed.Add((FeedEventTypes.PostStateChanged, null, action));
+        foreach (var (type, contentId, text) in Id == 0 ? [] : _feed)
+            Raise(new FeedEvent(type, Id, contentId, Version, null, null, State.ToString(), actor, now, text));
+        _feed.Clear();
     }
 
     private void Record(string actor, string action, DateTimeOffset now, string? detail) =>

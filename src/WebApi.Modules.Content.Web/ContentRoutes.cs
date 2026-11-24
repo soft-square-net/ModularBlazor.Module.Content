@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using soft.square.net.WebApi.Modules.Content.Web.Extensions;
 using Automation = soft.square.net.WebApi.Modules.Content.Web.Automation;
 using Categories = soft.square.net.WebApi.Modules.Content.Web.Categories;
+using Contents = soft.square.net.WebApi.Modules.Content.Web.Contents;
 using Posts = soft.square.net.WebApi.Modules.Content.Web.Posts;
 using Presses = soft.square.net.WebApi.Modules.Content.Web.Presses;
 
@@ -31,6 +32,19 @@ public sealed class ContentRoutes : ICarterModule
         MapPosts(content.MapGroup("/works").ExcludeFromDescription(), "works", documented: false);
         Posts.GetPublished.Map(content);
 
+        Contents.List.Map(content);
+        Contents.Get.Map(content);
+        Contents.GetRevision.Map(content);
+        Contents.Create.Map(content);
+        Contents.Edit.Map(content);
+        Contents.Act.Map(content);
+        Contents.Assign.Map(content);
+        Contents.Archive.Map(content);
+        Contents.Delete.Map(content);
+        Contents.GetPipeline.Map(content);
+        Contents.PublishPipeline.Map(content);
+        Contents.Events.Map(content);
+
         // Its own group, mapped after the others, so the OpenAPI document lists these last.
         var automation = app.MapGroup("").AddEndpointFilter<ContentProblemsFilter>();
         Automation.ListAccepted.Map(automation);
@@ -55,6 +69,11 @@ public sealed class ContentRoutes : ICarterModule
         Post<Posts.PublishDue>(posts, segment, documented);
         Post<Posts.Translate>(posts, segment, documented);
         Post<Posts.RemoveTranslation>(posts, segment, documented);
+        Post<Posts.AttachContent>(posts, segment, documented);
+        Post<Posts.DetachContent>(posts, segment, documented);
+        Post<Posts.ReorderContents>(posts, segment, documented);
+        Post<Posts.SetSlugs>(posts, segment, documented);
+        Post<Posts.Events>(posts, segment, documented);
     }
 
     private static void Post<TEndpoint>(RouteGroupBuilder posts, string segment, bool documented) where TEndpoint : IPostEndpoint

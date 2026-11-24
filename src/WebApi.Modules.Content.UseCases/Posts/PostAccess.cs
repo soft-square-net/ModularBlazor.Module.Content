@@ -20,6 +20,26 @@ public sealed class PostAccess(IAccessScopes access, IGrantStore grants, TimePro
             ? Result.Success()
             : Result.Forbidden($"You may not {what} ({permission}).");
 
+    /// <summary>Whether the caller holds the permission on these scopes now.</summary>
+    public Task<bool> HasAsync(string permission, IReadOnlyCollection<string> scopes, CancellationToken ct) =>
+        access.HasPermissionAsync(permission, scopes, ct);
+
+    /// <summary>
+    /// Where the caller holds any of the permissions now: the whole tenant, or these presses and categories (both empty: nowhere).
+    /// </summary>
+    public async Task<(bool Tenant, string[] Presses, string[] Categories)> WhereAsync(string[] permissions, CancellationToken ct)
+    {
+        var scopes = new HashSet<string>();
+        foreach (var permission in permissions) scopes.UnionWith(await access.ScopesAsync(permission, ct));
+        if (scopes.Contains(AccessScope.Tenant)) return (true, [], []);
+        return (false, [.. scopes.Where(s => s.StartsWith("press:")).Select(s => s["press:".Length..])],
+            [.. scopes.Where(s => s.StartsWith("category:")).Select(s => s["category:".Length..])]);
+    }
+
+    /// <summary>The permissions that let a caller see posts and contents they neither own nor work on.</summary>
+    public static readonly string[] SeeingPermissions =
+        [ContentPermissions.Accept, ContentPermissions.Assign, ContentPermissions.Return, ContentPermissions.Publish, ContentPermissions.Editor, ContentPermissions.Manage];
+
     /// <summary>For the automation endpoints: the permission must cover the whole tenant.</summary>
     public async Task<Result> RequireTenantWideAsync(string permission, string message, CancellationToken ct) =>
         (await access.ScopesAsync(permission, ct)).Contains(AccessScope.Tenant) ? Result.Success() : Result.Forbidden(message);
@@ -46,7 +66,7 @@ public sealed class PostAccess(IAccessScopes access, IGrantStore grants, TimePro
     /// <summary>Whether the caller may see Posts in these scopes without owning or reviewing them.</summary>
     public async Task<bool> SeesAsync(IReadOnlyCollection<string> scopes, CancellationToken ct)
     {
-        foreach (var permission in new[] { ContentPermissions.Accept, ContentPermissions.Assign, ContentPermissions.Return, ContentPermissions.Publish, ContentPermissions.Editor, ContentPermissions.Manage })
+        foreach (var permission in SeeingPermissions)
             if (await access.HasPermissionAsync(permission, scopes, ct)) return true;
         return false;
     }

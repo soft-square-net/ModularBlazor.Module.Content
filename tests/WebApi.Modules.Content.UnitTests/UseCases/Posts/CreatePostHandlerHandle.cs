@@ -14,7 +14,7 @@ public class CreatePostHandlerHandle
 
     public CreatePostHandlerHandle()
     {
-        _handler = new CreatePostHandler(_categories, _fixture.Posts, _fixture.PostAccess, _fixture.Details);
+        _handler = new CreatePostHandler(_categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details);
         _categories.GetByIdAsync("politics", Arg.Any<CancellationToken>()).Returns(PostBuilder.Category());
     }
 

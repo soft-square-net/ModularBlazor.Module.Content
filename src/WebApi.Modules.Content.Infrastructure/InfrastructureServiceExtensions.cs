@@ -1,5 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
+using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 
 namespace soft.square.net.WebApi.Modules.Content.Infrastructure;
@@ -14,6 +16,9 @@ public static class InfrastructureServiceExtensions
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
         services.AddTenantDbContext<ContentDbContext>();
+        // After AddTenantDbContext: tenant initializers run in registration order, so the schema is migrated first.
+        services.AddSingleton<ITenantInitializer, ContentBackfill>();
+        services.AddScoped<IContentStore, ContentStore>();
         return services;
     }
 }
