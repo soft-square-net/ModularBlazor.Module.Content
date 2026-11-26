@@ -178,6 +178,55 @@ field the tenant publishes. Its static URL prefix comes from that field.
   For one release the API still accepts the old names (and their numbers) as input. It always returns keys.
   DynamicFields' starter library has root fields for the first two; the others come with its starter kinds.
 
+## Categories and units
+
+**Categories.** A post is in one **primary** category and any number of others (at most 20), **all of its press**
+(decision D4).
+
+- `PostDetail.categoryId` is the primary one; `categories` lists them all, the primary first. `PostSummary.categoryId`
+  is the primary one.
+- `POST /posts` takes `categoryIds` (more categories) next to `categoryId`; the author right is needed in each.
+- `PUT /posts/{id}/categories { version, primaryCategoryId, categoryIds }` changes them. Who may: the post's editors (its
+  owner while it is editable, its reviewer on shift, the Desk) or the workflow (`content.unit.assign`). A category the
+  post is not in yet also needs the author right or a seeing right in it. A category of another press is 400.
+- A category change is a new version, but an approval or a schedule stays valid: the document did not change.
+- Each category has `nameEn` and `nameAr` (`name` is the English one, for older clients). `POST /categories` takes
+  `nameEn` and `nameAr`, or `name`; without an Arabic name it takes the English one.
+- Storage: the primary category keeps its column (`articles.CategoryId`); every category, the primary one too, is a row
+  of `post_categories`, always loaded with the post. The `UnitsAndCategories` migration makes each post's category its
+  first row, and starts every Arabic name as the English one.
+
+**Units.** A post (`unitId`, `unitPath`) and a content (`unitId`, `unitPath`) can belong to an **Organization unit**.
+
+- **Only the workflow sets it:** `PUT /posts/{id}/unit` and `PUT /contents/{id}/unit` `{ version, unitId? }` need
+  `content.unit.assign`, a permission meant for the workflow's service client and granted to nobody else by default.
+  Ordinary callers get 403. The moderator's choice reaches Content through the workflow. Pages show the unit read-only.
+- **The unit must serve the post:** its categories (Organization's `CategoriesOf`) must include one of the post's
+  categories (the content's category). `*` serves every category (D1). Otherwise 409; an unknown unit is 400; when
+  Organization can't be reached, 503.
+- **Reading units.** Content reads a unit through the gateway (`Content:ApiBaseUrl`) from Organization's local directory
+  (`GET /api/organization/local/units/{id}` and `.../categories`, with `HttpUnitDirectory`), with the caller's token and
+  tenant. It's cached per tenant for `Content:UnitCacheSeconds` (default 60), and dropped on any `org.unit-*.v1` event.
+- **Paths.** The unit's path (`/{root}/.../{unit}`, N-form ids) is stored with the post and the content, so rights checks
+  and the live hub need no call to Organization. `org.unit-moved.v1` rebases the stored paths at and below the unit.
+- **Scopes.** A post's scopes are `press:{p}`, `category:{c}` for every category, and `unit:{id}` for its unit and each
+  ancestor (`UnitScopes.For(path)`). A content's are its `press:` and `category:`, its unit's `unit:` scopes and
+  `section:{unit id, N form}` (the department rota's grant), or, before its section moved, `section:{section id}`. A unit
+  grant covers everything below the unit, in checks and in the post and content lists.
+- **Shifts sections.** `ContentItem.SectionId` held Shifts section ids. `shifts.section-moved.v1 { sectionId, unitId }`
+  (with the unit's path in the envelope) remaps every content of that section to the unit and clears the section. The
+  column stays until Shifts removes sections (S4).
+
+**Integration events** (Content turns on the platform's outbox and inbox, `UsesIntegrationEvents`):
+
+| Event | When | Data |
+| --- | --- | --- |
+| `content.post-categories-changed.v1` | a post's categories changed | `postId, publicId, version, pressId, primaryCategoryId, categories, previousCategories, unitId, unitPath` |
+| `content.post-unit-changed.v1` | a post's unit changed | `postId, publicId, version, pressId, primaryCategoryId, categories, unitId, unitPath, previousUnitId` |
+
+Both have the subject `post:{id}`, the source `content` and the post's unit path. They are sent once the save commits.
+Content subscribes to `shifts.section-moved.v1` and `org.unit-*.v1` (the manifest's `Subscriptions`).
+
 ## Migrations
 
 There is one migration set per engine (`Infrastructure/Data/Migrations/<Provider>`). `tests/WebApi.Modules.Content.MigrationTests`
@@ -186,6 +235,8 @@ Oracle Free 23. For each engine it:
 
 - applies every migration to an empty database;
 - checks the data step of `PostKindsAsFieldKeys` both ways;
+- checks `UnitsAndCategories`: posts keep their categories and unit, and down and up again a post's category becomes its
+  `post_categories` row and the Arabic names start as the English ones; the integration outbox and inbox exist;
 - runs every Down and every Up again;
 - checks that the model snapshot matches the model (`HasPendingModelChanges`; this check needs no Docker).
 
@@ -201,21 +252,20 @@ dotnet test tests/WebApi.Modules.Content.MigrationTests
 
 | Request | Answer |
 | --- | --- |
-| `GET /api/content/lookups/categories?q=&skip=&take=` | `{ items: [{ key, text }], hasMore }`: the tenant's categories, key = category id, text = name, ordered by name |
+| `GET /api/content/lookups/categories?q=&skip=&take=` | `{ items: [{ key, text }], hasMore }`: the tenant's categories, key = category id, text = the English name (the Arabic one in `ar`), ordered by the English name |
 | `GET /api/content/lookups/categories?parent={pressId}` | the categories of one press |
 | `GET /api/content/lookups/categories/keys?keys=ahram-sports,daily-politics` | the text of saved ids |
-| `POST /api/content/lookups/categories/query` | the picker: filter on `PressId`; the `PressId` column in `extra` |
+| `POST /api/content/lookups/categories/query` | the picker: filter on `PressId`; the `PressId`, `NameEn` and `NameAr` columns in `extra` |
 
-- Search runs on the name and the id.
+- Search runs on both names and the id.
 - Paging follows the platform contract: `take` is at most 100, and `hasMore` is read from take + 1 rows.
 - Like `GET /categories`, it needs a signed-in user and no permission.
-- Categories have one name (no per-language names yet), so the text is the same in every culture.
 
 **Live topic `content:post:{id}`** (`UseCases/Live/PostLive.cs`):
 
 - **Manifest:** `LiveTopics = [new LiveTopic("post", "content.author")]`.
   - Content has no single "read a post" permission, so the topic uses the authors' permission. Authors are the studio's users.
-  - The hub checks it on `post:{id}`, and on the post's `press:` and `category:` scopes from `PostLiveScopeResolver` (an `ILiveScopeResolver` in the module's services).
+  - The hub checks it on `post:{id}`, and on the post's `press:`, `category:` (every category) and `unit:` (its unit and the unit's ancestors) scopes from `PostLiveScopeResolver` (an `ILiveScopeResolver` in the module's services).
   - The resolver runs only where Content is loaded on the hub's pool (core).
   - A caller without the right is refused, and the ContentDesigner studio then polls the feed.
 - **Messages:** once the feed rows (`FeedEntry`) of a save are committed, `LivePostPublisher` publishes `post.changed` with `{ eventId, type, contentId? }` and `sequence: null`.

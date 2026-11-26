@@ -36,8 +36,17 @@ public sealed class FakeContentStore : IContentStore
         Task.FromResult<IReadOnlyList<(Guid ContentId, int PostId)>>(
             Posts.SelectMany(p => p.ContentLinks.Where(c => contentIds.Contains(c.ContentId)).Select(c => (c.ContentId, p.Id))).Distinct().ToList());
 
-    public Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct) =>
-        Task.FromResult(Posts.FirstOrDefault(p => p.Id == postId) is { } post ? ((string, string)?)(post.PressId, post.CategoryId) : null);
+    public Task<IReadOnlyCollection<string>?> PostScopesAsync(int postId, CancellationToken ct) =>
+        Task.FromResult(Posts.FirstOrDefault(p => p.Id == postId)?.Scopes);
+
+    public Task<IReadOnlyList<ContentItem>> ContentsInSectionAsync(string sectionId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ContentItem>>(Contents.Where(c => c.SectionId == sectionId && c.UnitId == null).ToList());
+
+    public Task<IReadOnlyList<Post>> PostsInUnitTreeAsync(string path, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<Post>>(Posts.Where(p => p.UnitPath == path || (p.UnitPath?.StartsWith(path + "/") ?? false)).ToList());
+
+    public Task<IReadOnlyList<ContentItem>> ContentsInUnitTreeAsync(string path, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<ContentItem>>(Contents.Where(c => c.UnitPath == path || (c.UnitPath?.StartsWith(path + "/") ?? false)).ToList());
 
     public Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct) => Task.FromResult(Posts.Any(p => p.ContentLinks.Any(c => c.ContentId == contentId)));
 

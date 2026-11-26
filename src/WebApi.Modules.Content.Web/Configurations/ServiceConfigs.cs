@@ -31,6 +31,9 @@ public static class ServiceConfigs
         services.AddScoped<DeskPublishing>();
         services.AddScoped<PostContentEditing>();
         services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds.PostKindRules>();
+        // Units (Organization) and the integration events the post use cases publish.
+        services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Units.UnitRules>();
+        services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Events.ContentEventPublisher>();
 
         // Shared contents, the pipeline and the change feed.
         services.AddScoped<ContentPipelines>();

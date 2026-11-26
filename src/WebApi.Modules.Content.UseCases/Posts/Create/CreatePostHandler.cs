@@ -19,12 +19,23 @@ public sealed class CreatePostHandler(IReadRepository<Category> categories, IRep
         var allowed = await access.RequireAsync(ContentPermissions.Author, scopes, "write in this category", ct);
         if (!allowed.IsSuccess) return allowed.As<PostDetail>();
 
+        var others = new List<Category>();
+        foreach (var id in (command.CategoryIds ?? []).Where(id => !string.IsNullOrWhiteSpace(id) && id != category.Id).Distinct())
+        {
+            var other = await categories.GetByIdAsync(id, ct);
+            if (other is null) return Result<PostDetail>.Conflict($"Unknown category '{id}'.");
+            var author = await access.RequireAsync(ContentPermissions.Author, [AccessScope.Press(other.PressId), AccessScope.Category(other.Id)],
+                $"write in category '{other.Id}'", ct);
+            if (!author.IsSuccess) return author.As<PostDetail>();
+            others.Add(other);
+        }
+
         var kind = await kinds.ForNewPostAsync(command.PostKind, ct);
         if (!kind.IsSuccess) return kind.As<PostDetail>();
 
         var publicId = Post.NewPublicId();
         var (document, contents, created) = await split.CreateAsync(access.Me, category.PressId, category.Id, publicId, command.Document, access.Now, ct);
-        var post = Post.Create(access.Me, category, command.Title, command.Body, access.Now, kind.Value.Key, document, contents, publicId);
+        var post = Post.Create(access.Me, category, command.Title, command.Body, access.Now, kind.Value.Key, document, contents, publicId, others);
         foreach (var content in created) store.Add(content);
         await posts.AddAsync(post, ct); // one save: the post and its contents
         return await details.GetAsync(post.Id, ct);

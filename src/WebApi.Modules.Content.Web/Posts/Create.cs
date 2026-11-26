@@ -13,6 +13,6 @@ public sealed class Create : IPostEndpoint
             .RequirePermission(ContentPermissions.Author);
 
     private static async Task<Results<Created<PostDetail>, ProblemHttpResult>> HandleAsync(NewPost request, string resourceSegment, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new CreatePostCommand(request.CategoryId, request.Title, request.Body ?? "", request.PostKind, request.Document), ct))
+        (await sender.Send(new CreatePostCommand(request.CategoryId, request.Title, request.Body ?? "", request.PostKind, request.Document, request.CategoryIds), ct))
             .ToCreatedResult(post => $"{resourceSegment}/{post.Id}");
 }

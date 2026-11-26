@@ -23,7 +23,7 @@ public sealed class ContentDetails(IReadRepository<ContentItem> reader, ContentA
             content.ArchivedAt, content.Version,
             content.Revisions.OrderBy(r => r.Revision).Select(r => new ContentRevisionInfo(r.Revision, r.FieldKey, r.FieldVersion, r.By, r.At)).ToList(),
             content.History.OrderBy(h => h.At).ThenBy(h => h.Id).Select(h => new ContentHistoryDto(h.At, h.Actor, h.Action, h.Stage, h.Detail)).ToList(),
-            actions, canEdit);
+            actions, canEdit, content.UnitId, content.UnitPath);
     }
 
     public static Result<ContentDetail> NotFound(Guid id) => Result<ContentDetail>.NotFound($"Content {id} was not found.");
@@ -55,10 +55,11 @@ public sealed class GetContentRevisionHandler(IReadRepository<ContentItem> reade
 
 /// <summary>
 /// The library: the contents the caller may see (made by or assigned to them, or in a press or category where they hold
-/// a content permission), newest change first, filtered. Archived ones only when asked.
+/// a content permission, or of a unit at or below one where they hold one), newest change first, filtered. Archived ones
+/// only when asked.
 /// </summary>
 public sealed record ListContentsQuery(string? SectionId = null, string? Stage = null, string? AssigneeId = null, string? FieldKey = null,
-    bool Archived = false, int Skip = 0, int Take = 50) : IQuery<Result<IReadOnlyList<ContentSummary>>>;
+    bool Archived = false, int Skip = 0, int Take = 50, Guid? UnitId = null) : IQuery<Result<IReadOnlyList<ContentSummary>>>;
 
 public sealed class ListContentsHandler(IReadRepository<ContentItem> reader, ContentAccess access)
     : IQueryHandler<ListContentsQuery, Result<IReadOnlyList<ContentSummary>>>
@@ -68,11 +69,14 @@ public sealed class ListContentsHandler(IReadRepository<ContentItem> reader, Con
     public async ValueTask<Result<IReadOnlyList<ContentSummary>>> Handle(ListContentsQuery query, CancellationToken ct)
     {
         var me = access.Me;
-        var (tenant, presses, categories) = await access.Posts.WhereAsync(
+        var places = await access.Posts.WhereAsync(
             [.. Posts.PostAccess.SeeingPermissions, ContentPermissions.Author, ContentPermissions.Review], ct);
-        Expression<Func<ContentItem, bool>> visible = tenant
+        var (presses, categories) = (places.Presses, places.Categories);
+        Expression<Func<ContentItem, bool>> visible = places.Tenant
             ? c => true
-            : c => c.CreatedBy == me || c.AssigneeId == me || presses.Contains(c.PressId) || categories.Contains(c.CategoryId);
+            : Posts.UnitFilter.Or<ContentItem>(
+                c => c.CreatedBy == me || c.AssigneeId == me || presses.Contains(c.PressId) || categories.Contains(c.CategoryId),
+                places.Units, c => c.UnitPath);
         var contents = await reader.ListAsync(new ContentListSpec(visible, query with { Take = Math.Clamp(query.Take, 1, MaxTake) }), ct);
         return (contents ?? []).Select(ContentSummary.From).ToList();
     }
@@ -84,6 +88,7 @@ public sealed class ContentListSpec : Specification<ContentItem>
     {
         Query.Where(visible).Where(c => q.Archived ? c.ArchivedAt != null : c.ArchivedAt == null);
         if (!string.IsNullOrWhiteSpace(q.SectionId)) Query.Where(c => c.SectionId == q.SectionId);
+        if (q.UnitId is { } unit) Query.Where(c => c.UnitId == unit);
         if (!string.IsNullOrWhiteSpace(q.Stage)) Query.Where(c => c.Stage == q.Stage);
         if (!string.IsNullOrWhiteSpace(q.AssigneeId)) Query.Where(c => c.AssigneeId == q.AssigneeId);
         if (!string.IsNullOrWhiteSpace(q.FieldKey)) Query.Where(c => c.FieldKey == q.FieldKey);

@@ -64,3 +64,14 @@ public enum PostEditor { Owner, Reviewer, Desk }
 /// </summary>
 public sealed record PostChange(string? Title = null, string? Body = null, PostDocument? Document = null,
     IReadOnlyList<ContentRef>? Contents = null, IReadOnlyDictionary<string, string>? Slugs = null);
+
+/// <summary>One of a post's categories (the primary one included). Unique per post.</summary>
+public sealed class PostCategory : EntityBase<int>
+{
+    private PostCategory() { } // EF Core
+
+    internal PostCategory(string categoryId) => CategoryId = categoryId;
+
+    public int PostId { get; private set; }
+    public string CategoryId { get; private set; } = "";
+}

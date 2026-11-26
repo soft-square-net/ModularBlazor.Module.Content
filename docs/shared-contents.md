@@ -78,5 +78,6 @@ Published snapshots are untouched. It writes no feed events.
 - Translations stay per post (overlays on the working document); per-content translations come with the designer.
 - Slugs are stored and edited (`PUT /posts/{id}/slugs`); no default slug is generated and there is no public lookup by
   slug yet (phase 8).
-- Department-section grant scopes (`section:{id}`) need Shifts (phase 2); `SectionId` is a plain key for now.
+- `SectionId` is legacy: a content of a unit has the `section:{unit id}` scope (the department rota's grant), and
+  `shifts.section-moved.v1` remaps sections to units (see the README's "Categories and units"). The column goes with S4.
 - Feed retention (`events` grows); a sweep like Storage's comes with the Elsa phase.

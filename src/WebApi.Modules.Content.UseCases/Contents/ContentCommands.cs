@@ -48,7 +48,7 @@ public sealed class CreateContentHandler(IReadRepository<Category> categories, I
             if (post.Version != command.PostVersion)
                 return Result<ContentDetail>.Conflict($"Post {postId} is at version {post.Version}, not {command.PostVersion}; reload it and try again.");
         }
-        var categoryId = command.CategoryId ?? post?.CategoryId;
+        var categoryId = command.CategoryId ?? post?.PrimaryCategoryId;
         var category = categoryId is null ? null : await categories.GetByIdAsync(categoryId, ct);
         if (category is null) return Result<ContentDetail>.Conflict($"Unknown category '{categoryId}'.");
         var author = await access.Posts.RequireAsync(ContentPermissions.Author, [AccessScope.Press(category.PressId), AccessScope.Category(category.Id)],

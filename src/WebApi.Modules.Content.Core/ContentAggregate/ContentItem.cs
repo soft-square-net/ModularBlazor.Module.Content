@@ -1,4 +1,5 @@
 using System.Text.Json;
+using soft.square.net.WebApi.Modules.Content.Core.Common;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PipelineAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
@@ -14,7 +15,9 @@ namespace soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
 /// <see cref="Version"/> counts every change, values or not, and is the optimistic concurrency token callers send back.</item>
 /// <item><see cref="Stage"/> is a key of the tenant's pipeline (data, published by Elsa), never an enum: the pipeline says
 /// which actions move it and who may take them; the caller checks the who, this aggregate the rest.</item>
-/// <item>A section (Shifts) and an assignee work on it; the Desk reviews it: accept (pins <see cref="AcceptedRevision"/>),
+/// <item>An Organization unit (<see cref="UnitId"/>, set by the workflow) or, before Shifts moved its sections to
+/// Organization, a Shifts section (<see cref="SectionId"/>, remapped to the unit by <c>shifts.section-moved.v1</c>) and an
+/// assignee work on it; the Desk reviews it: accept (pins <see cref="AcceptedRevision"/>),
 /// reject with a note, or edit as Desk.</item>
 /// </list>
 /// Its values are one node (<see cref="PostNode"/>): nested nodes (a gallery's images) stay inside it.
@@ -46,7 +49,12 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     public string CategoryId { get; private set; } = "";
     /// <summary>The public id of the post it was made for, if any: only that post's whole-document edit may change it.</summary>
     public string? OriginPostId { get; private set; }
+    /// <summary>The Shifts section it was given to (legacy): remapped to <see cref="UnitId"/> when the section moves to Organization.</summary>
     public string? SectionId { get; private set; }
+    /// <summary>The Organization unit that works on it; null when none.</summary>
+    public Guid? UnitId { get; private set; }
+    /// <summary>The unit's path (<c>/{root}/.../{unit}</c>, N-form ids), kept in step with <c>org.unit-moved</c>.</summary>
+    public string? UnitPath { get; private set; }
     public string? AssigneeId { get; private set; }
     public string CreatedBy { get; private set; } = "";
     public DateTimeOffset CreatedAt { get; private set; }
@@ -63,8 +71,16 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     public IReadOnlyList<ContentRevision> Revisions => _revisions;
     public IReadOnlyList<ContentHistoryEntry> History => _history;
 
-    /// <summary>Its grant scopes: the press and category it was made in.</summary>
-    public IReadOnlyCollection<string> Scopes => [$"press:{PressId}", $"category:{CategoryId}"];
+    /// <summary>
+    /// Its grant scopes: the press and category it was made in; its unit and the unit's ancestors (<c>unit:{id}</c>) with
+    /// <c>section:{unit id}</c> (a department rota's grant); or, while it still has a Shifts section, <c>section:{section id}</c>.
+    /// </summary>
+    public IReadOnlyCollection<string> Scopes =>
+    [
+        $"press:{PressId}", $"category:{CategoryId}",
+        .. UnitPathRules.Scopes(UnitPath),
+        .. UnitId is { } unit ? new[] { $"section:{UnitPathRules.Id(unit)}" } : SectionId is { } section ? new[] { $"section:{section}" } : []
+    ];
 
     /// <summary>The current values as a document node.</summary>
     public PostNode Node => ReadNode(ValuesJson);
@@ -107,7 +123,7 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
             Id = Guid.NewGuid(),
             NodeId = node.NodeId,
             PressId = post.PressId,
-            CategoryId = post.CategoryId,
+            CategoryId = post.PrimaryCategoryId,
             OriginPostId = post.StablePublicId,
             CreatedBy = post.OwnerId,
             CreatedAt = post.CreatedAt,
@@ -162,11 +178,58 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     public void Assign(string actor, string? sectionId, string? assigneeId, DateTimeOffset now)
     {
         RequireActive("assign");
-        SectionId = Optional(sectionId);
+        // A content of a unit has no section any more (the unit replaced it): a legacy section id given with it is dropped.
+        SectionId = UnitId is null ? Optional(sectionId) : null;
         AssigneeId = Optional(assigneeId);
         var detail = $"{SectionId}/{AssigneeId}";
         Change(actor, "assigned", now, detail);
         Emit(FeedEventTypes.ContentAssigned, actor, now, detail);
+    }
+
+    /// <summary>
+    /// Gives it to an Organization unit (<paramref name="unitPath"/> ends with the unit's id), or to none. Clears a legacy
+    /// section. False when nothing changes. Only the workflow may (the caller checks <c>content.unit.assign</c> and that the
+    /// unit's categories cover the content's).
+    /// </summary>
+    public bool ChangeUnit(string actor, Guid? unitId, string? unitPath, DateTimeOffset now)
+    {
+        RequireActive("give to a unit");
+        var path = UnitPathRules.Require(unitId, unitPath);
+        if (unitId == UnitId && path == UnitPath && (unitId is null || SectionId is null)) return false;
+        var detail = unitId is null ? null : UnitPathRules.Id(unitId.Value);
+        Change(actor, unitId is null ? "unit removed" : "unit set", now, detail, () =>
+        {
+            UnitId = unitId;
+            UnitPath = path;
+            if (unitId is not null) SectionId = null;
+        });
+        Emit(FeedEventTypes.ContentAssigned, actor, now, detail);
+        return true;
+    }
+
+    /// <summary>
+    /// Its Shifts section moved to Organization (<c>shifts.section-moved.v1</c>): the section becomes that unit. False when it
+    /// is not in that section (or already has a unit). A system change: a new version, no feed event.
+    /// </summary>
+    public bool RemapSection(string sectionId, Guid unitId, string unitPath, DateTimeOffset now)
+    {
+        if (SectionId != sectionId || UnitId is not null) return false;
+        var path = UnitPathRules.Require(unitId, unitPath);
+        Change("system", "section moved to unit", now, $"section {sectionId} → unit {UnitPathRules.Id(unitId)}", () =>
+        {
+            UnitId = unitId;
+            UnitPath = path;
+            SectionId = null;
+        });
+        return true;
+    }
+
+    /// <summary>The unit, or one above it, moved in Organization: its path is rebased (not a change: no version, no history).</summary>
+    public bool RebaseUnit(string oldPath, string newPath)
+    {
+        if (UnitPathRules.Rebase(UnitPath, oldPath, newPath) is not { } rebased) return false;
+        UnitPath = rebased;
+        return true;
     }
 
     /// <summary>Takes it out of the library: no new post can use it and nobody works on it; the posts that use it keep it.</summary>

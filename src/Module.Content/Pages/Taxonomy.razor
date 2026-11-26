@@ -75,8 +75,12 @@
           <div class="mud-input-wrapper"><input id="ct-cat-id" class="mud-input-slot" @bind="_categoryId" required pattern="[a-z0-9][a-z0-9-]*" placeholder="local" /></div>
         </div>
         <div class="mud-input-control ct-inline ct-grow">
-          <label class="mud-input-label" for="ct-cat-name">@L["Name"]</label>
+          <label class="mud-input-label" for="ct-cat-name">@L["English name"]</label>
           <div class="mud-input-wrapper"><input id="ct-cat-name" class="mud-input-slot" @bind="_categoryName" required placeholder="@L["Local news"]" /></div>
+        </div>
+        <div class="mud-input-control ct-inline ct-grow">
+          <label class="mud-input-label" for="ct-cat-name-ar">@L["Arabic name"]</label>
+          <div class="mud-input-wrapper"><input id="ct-cat-name-ar" class="mud-input-slot" dir="rtl" lang="ar" @bind="_categoryNameAr" placeholder="@L["the English name when empty"]" /></div>
         </div>
         <button type="submit" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" disabled="@(Busy || _presses.Count == 0)">@L["Add category"]</button>
       </form>
@@ -87,9 +91,12 @@
       else
       {
         <ul class="ct-list">
-          @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.Name))
+          @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.NameEn))
           {
-            <li><strong>@category.Name</strong> <span class="ct-muted">@category.Id · @(_presses.FirstOrDefault(p => p.Id == category.PressId)?.Name ?? category.PressId)</span></li>
+            <li>
+              <strong>@category.NameEn</strong> · <span dir="rtl" lang="ar">@category.NameAr</span>
+              <span class="ct-muted">@category.Id · @(_presses.FirstOrDefault(p => p.Id == category.PressId)?.Name ?? category.PressId)</span>
+            </li>
           }
         </ul>
       }
@@ -100,7 +107,7 @@
 @code {
   private List<PressDto> _presses = [];
   private List<CategoryDto> _categories = [];
-  private string? _pressId, _pressName, _categoryPress, _categoryId, _categoryName;
+  private string? _pressId, _pressName, _categoryPress, _categoryId, _categoryName, _categoryNameAr;
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
@@ -132,14 +139,15 @@
   {
     await RunAsync(async () =>
     {
-      var category = await Content.AddCategoryAsync(new CategoryDto
+      var category = await Content.AddCategoryAsync(new NewCategory
       {
         Id = (_categoryId ?? "").Trim(),
         PressId = _categoryPress ?? "",
-        Name = (_categoryName ?? "").Trim(),
+        NameEn = (_categoryName ?? "").Trim(),
+        NameAr = string.IsNullOrWhiteSpace(_categoryNameAr) ? null : _categoryNameAr.Trim(),
       });
-      await MudTail.ToastAsync(L["Category {0} added.", category.Name], "success");
-      _categoryId = _categoryName = null;
+      await MudTail.ToastAsync(L["Category {0} added.", CategoryName(category)], "success");
+      _categoryId = _categoryName = _categoryNameAr = null;
     }, then: LoadAsync);
   }
 }

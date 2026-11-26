@@ -20,4 +20,11 @@ public sealed class ContentOptions
 
     /// <summary>How long the tenant's post kinds (DynamicFields' root post fields) stay cached, in seconds (0: not cached). Default 60.</summary>
     public int PostKindCacheSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// How long an Organization unit (its path and categories, read from Organization's directory at
+    /// <c>{ApiBaseUrl}/api/organization/local/units/...</c>) stays cached, in seconds (0: not cached). Default 60; an
+    /// <c>org.unit-*</c> event drops it at once.
+    /// </summary>
+    public int UnitCacheSeconds { get; set; } = 60;
 }

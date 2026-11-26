@@ -11,8 +11,8 @@ public sealed class PostListSpec : Specification<Post, PostSummary>
     {
         foreach (var filter in filters) Query.Where(filter);
         Query.OrderByDescending(a => a.UpdatedAt).Take(200).AsNoTracking();
-        Query.Select(a => new PostSummary(a.Id, a.PostKind, a.PressId, a.CategoryId, a.Title, a.OwnerId, a.State, a.Version,
+        Query.Select(a => new PostSummary(a.Id, a.PostKind, a.PressId, a.PrimaryCategoryId, a.Title, a.OwnerId, a.State, a.Version,
             a.AcceptedAt, a.AcceptedShiftId, a.AssigneeId,
-            a.SubmittedAt, a.ScheduledFor, a.TransferredFromShift, a.UpdatedAt));
+            a.SubmittedAt, a.ScheduledFor, a.TransferredFromShift, a.UpdatedAt, a.UnitId));
     }
 }

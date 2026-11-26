@@ -35,8 +35,17 @@ public interface IContentStore
     /// <summary>The ids of the posts that use these contents, untracked (the live fan-out of a content's feed rows).</summary>
     Task<IReadOnlyList<(Guid ContentId, int PostId)>> PostIdsUsingAsync(IReadOnlyCollection<Guid> contentIds, CancellationToken ct);
 
-    /// <summary>A post's press and category, untracked; null when there is no such post in the tenant.</summary>
-    Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct);
+    /// <summary>A post's grant scopes (press, categories, unit and its ancestors), untracked; null when there is no such post in the tenant.</summary>
+    Task<IReadOnlyCollection<string>?> PostScopesAsync(int postId, CancellationToken ct);
+
+    /// <summary>The contents still given to this Shifts section (no unit yet), tracked.</summary>
+    Task<IReadOnlyList<ContentItem>> ContentsInSectionAsync(string sectionId, CancellationToken ct);
+
+    /// <summary>The posts whose unit is the unit at <paramref name="path"/> or below it, tracked.</summary>
+    Task<IReadOnlyList<Post>> PostsInUnitTreeAsync(string path, CancellationToken ct);
+
+    /// <summary>The contents whose unit is the unit at <paramref name="path"/> or below it, tracked.</summary>
+    Task<IReadOnlyList<ContentItem>> ContentsInUnitTreeAsync(string path, CancellationToken ct);
 
     /// <summary>Whether any post uses this content.</summary>
     Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct);

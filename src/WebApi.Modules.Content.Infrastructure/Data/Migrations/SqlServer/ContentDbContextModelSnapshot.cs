@@ -23,13 +23,82 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("soft.square.net.WebApi.Data.Messaging.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcessedAt");
+
+                    b.ToTable("integration_inbox", "content");
+                });
+
+            modelBuilder.Entity("soft.square.net.WebApi.Data.Messaging.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SentAt", "OccurredAt");
+
+                    b.ToTable("integration_outbox", "content");
+                });
+
             modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate.Category", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("NameAr")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("NameEn")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -169,6 +238,13 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UnitPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -187,6 +263,8 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("TenantId");
+
+                    b.HasIndex("UnitId");
 
                     b.HasIndex("UpdatedAt");
 
@@ -374,11 +452,6 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CategoryId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
                     b.Property<bool>("ContentsSplit")
                         .HasColumnType("bit");
 
@@ -408,6 +481,12 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("PrimaryCategoryId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("CategoryId");
 
                     b.Property<string>("PublicId")
                         .IsRequired()
@@ -492,6 +571,13 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasColumnType("nvarchar(max)")
                         .HasDefaultValue("[]");
 
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("UnitPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -510,9 +596,37 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
 
                     b.HasIndex("TenantId");
 
-                    b.HasIndex("State", "CategoryId");
+                    b.HasIndex("UnitId");
+
+                    b.HasIndex("State", "PrimaryCategoryId");
 
                     b.ToTable("articles", "content");
+                });
+
+            modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CategoryId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("PostId", "CategoryId")
+                        .IsUnique();
+
+                    b.ToTable("post_categories", "content");
                 });
 
             modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostContent", b =>
@@ -660,6 +774,15 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostCategory", b =>
+                {
+                    b.HasOne("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Post", null)
+                        .WithMany("CategoryLinks")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostContent", b =>
                 {
                     b.HasOne("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Post", null)
@@ -695,6 +818,8 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
 
             modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Post", b =>
                 {
+                    b.Navigation("CategoryLinks");
+
                     b.Navigation("ContentLinks");
 
                     b.Navigation("History");

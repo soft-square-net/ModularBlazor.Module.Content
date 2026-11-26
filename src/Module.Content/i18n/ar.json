@@ -108,5 +108,17 @@
   "Translate": "ترجمة",
   "Translating needs the Dynamic Fields module (its translate-content dialog).": "تتطلب الترجمة وحدة الحقول الديناميكية (حوار ترجمة المحتوى).",
   "Translation into {0} saved.": "حُفظت الترجمة إلى {0}.",
-  "Translation removed.": "أُزيلت الترجمة."
+  "Translation removed.": "أُزيلت الترجمة.",
+  "English name": "الاسم بالإنجليزية",
+  "Arabic name": "الاسم بالعربية",
+  "the English name when empty": "الاسم الإنجليزي إن تُرك فارغًا",
+  "The primary category. A post may be in more categories of the same press.": "التصنيف الرئيسي. يمكن أن يكون المنشور في تصنيفات أخرى من الإصدار نفسه.",
+  "More categories": "تصنيفات أخرى",
+  "Unit": "الوحدة",
+  "none": "لا يوجد",
+  "Set by the workflow from the moderator's choice; it cannot be changed here.": "يحددها سير العمل بناءً على اختيار المشرف، ولا يمكن تغييرها هنا.",
+  "A post is in one primary category and any others of its press. Its unit is set by the workflow and is shown read-only.": "للمنشور تصنيف رئيسي واحد وأي تصنيفات أخرى من إصداره. وحدته يحددها سير العمل وتظهر للقراءة فقط.",
+  "Primary category": "التصنيف الرئيسي",
+  "Save categories": "حفظ التصنيفات",
+  "Categories saved.": "تم حفظ التصنيفات."
 }

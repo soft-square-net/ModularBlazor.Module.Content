@@ -26,6 +26,12 @@ public abstract class ContentPageBase : ComponentBase
     /// <summary>Content routes (/api/content/...) reach the pool that runs the module through the gateway.</summary>
     protected ContentClient Content => new(HttpClients.CreateClient(HttpClientNames.WebApi));
 
+    /// <summary>A category's name in the UI language: its Arabic name in Arabic, else its English one.</summary>
+    protected static string CategoryName(CategoryDto category) =>
+        System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar" && !string.IsNullOrWhiteSpace(category.NameAr)
+            ? category.NameAr
+            : string.IsNullOrWhiteSpace(category.NameEn) ? category.Name : category.NameEn;
+
     protected bool Busy { get; private set; }
     protected string? Error { get; set; }
 

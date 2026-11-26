@@ -28,6 +28,12 @@ public sealed class ContentDbContext : TenantDbContext
 
     protected override string Schema => "content";
 
+    /// <summary>
+    /// The platform's integration outbox and inbox: the module publishes <c>content.*</c> events and follows
+    /// <c>shifts.section-moved.v1</c> and <c>org.unit-moved.v1</c>.
+    /// </summary>
+    protected override bool UsesIntegrationEvents => true;
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         base.OnConfiguring(optionsBuilder);
@@ -52,6 +58,7 @@ public sealed class ContentDbContext : TenantDbContext
     public DbSet<ContentRevision> ContentRevisions => Set<ContentRevision>();
     public DbSet<PostContent> PostContents => Set<PostContent>();
     public DbSet<PostSlug> PostSlugs => Set<PostSlug>();
+    public DbSet<PostCategory> PostCategories => Set<PostCategory>();
     public DbSet<Pipeline> Pipelines => Set<Pipeline>();
     public DbSet<FeedEntry> Events => Set<FeedEntry>();
 

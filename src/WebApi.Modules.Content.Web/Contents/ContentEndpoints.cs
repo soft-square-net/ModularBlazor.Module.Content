@@ -24,8 +24,8 @@ public sealed class List : IEndpoint
 {
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder app) =>
         app.MapGet("/contents", async (string? sectionId, string? stage, string? assigneeId, string? fieldKey, bool? archived, int? skip, int? take,
-                ISender sender, CancellationToken ct) =>
-            (await sender.Send(new ListContentsQuery(sectionId, stage, assigneeId, fieldKey, archived ?? false, skip ?? 0, take ?? 50), ct)).ToOkResult())
+                Guid? unitId, ISender sender, CancellationToken ct) =>
+            (await sender.Send(new ListContentsQuery(sectionId, stage, assigneeId, fieldKey, archived ?? false, skip ?? 0, take ?? 50, unitId), ct)).ToOkResult())
             .WithName("Content_ListContents")
             .WithSummary("The shared contents the caller may see, newest change first.");
 }
@@ -86,6 +86,17 @@ public sealed class Assign : IEndpoint
             (await sender.Send(new AssignContentCommand(id, r.Version, r.SectionId, r.AssigneeId), ct)).ToOkResult())
             .RequirePermission(ContentPermissions.Assign)
             .WithName("Content_AssignContent");
+}
+
+/// <summary>PUT /contents/{id}/unit: give it to an Organization unit, or to none (the workflow only: content.unit.assign).</summary>
+public sealed class SetUnit : IEndpoint
+{
+    public static RouteHandlerBuilder Map(IEndpointRouteBuilder app) =>
+        app.MapPut("/contents/{id:guid}/unit", async (Guid id, Posts.UnitAssignment r, ISender sender, CancellationToken ct) =>
+            (await sender.Send(new soft.square.net.WebApi.Modules.Content.UseCases.Posts.Filing.SetContentUnitCommand(id, r.Version, r.UnitId), ct)).ToOkResult())
+            .RequirePermission(ContentPermissions.UnitAssign)
+            .WithName("Content_SetContentUnit")
+            .WithSummary("Give the content to an Organization unit that serves its category (the workflow only).");
 }
 
 /// <summary>POST /contents/{id}/archive: out of the library; the posts that use it keep it.</summary>

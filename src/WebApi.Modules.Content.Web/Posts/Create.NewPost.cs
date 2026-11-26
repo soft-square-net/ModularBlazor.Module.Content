@@ -7,4 +7,5 @@ namespace soft.square.net.WebApi.Modules.Content.Web.Posts;
 /// published DynamicFields root post field key (default <c>post.article</c>); the old enum names (<c>Article</c>,
 /// <c>News</c>, <c>Video</c>, <c>Reportage</c>, <c>PhotoStory</c>, <c>Other</c>) are still accepted for one release.
 /// </summary>
-public sealed record NewPost(string CategoryId, string Title, string? Body, string PostKind = PostKinds.Article, PostDocument? Document = null);
+public sealed record NewPost(string CategoryId, string Title, string? Body, string PostKind = PostKinds.Article, PostDocument? Document = null,
+    IReadOnlyList<string>? CategoryIds = null);

@@ -22,6 +22,11 @@ public static class ContentPermissions
     public const string Events = "content.events";
     /// <summary>Publish the content pipeline (Elsa, or an admin), tenant-wide.</summary>
     public const string Pipeline = "content.pipeline";
+    /// <summary>
+    /// Put a post or a content in an Organization unit (the workflow's service client; granted to nobody else by default:
+    /// the moderator's choice reaches Content through the workflow).
+    /// </summary>
+    public const string UnitAssign = "content.unit.assign";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -35,6 +40,7 @@ public static class ContentPermissions
         new(Publish, "Schedule and publish approved Posts (shift Desk)."),
         new(Manage, "Manage presses and categories."),
         new(Events, "Read the change feed of posts and contents (workflow services), tenant-wide."),
-        new(Pipeline, "Publish the content pipeline: stages and actions (workflow services, admins), tenant-wide.")
+        new(Pipeline, "Publish the content pipeline: stages and actions (workflow services, admins), tenant-wide."),
+        new(UnitAssign, "Put posts and contents in an Organization unit (the workflow's service client only).")
     ];
 }
