@@ -4,7 +4,7 @@ using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 
 /// <summary>A content in a list (the library, a post's contents tray).</summary>
-public sealed record ContentSummary(Guid Id, string NodeId, string FieldKey, int FieldVersion, PostKind PostKind, string PressId, string CategoryId,
+public sealed record ContentSummary(Guid Id, string NodeId, string FieldKey, int FieldVersion, string PostKind, string PressId, string CategoryId,
     string? SectionId, string? AssigneeId, string CreatedBy, string Stage, int Revision, int? AcceptedRevision, int Version,
     DateTimeOffset UpdatedAt, bool Archived)
 {
@@ -16,7 +16,7 @@ public sealed record ContentSummary(Guid Id, string NodeId, string FieldKey, int
 /// One content with its values, revisions and history. <see cref="Actions"/>: the pipeline actions the caller may take now;
 /// <see cref="CanEdit"/>: whether the caller may change its values now.
 /// </summary>
-public sealed record ContentDetail(Guid Id, string NodeId, string FieldKey, int FieldVersion, PostKind PostKind, PostNode Values,
+public sealed record ContentDetail(Guid Id, string NodeId, string FieldKey, int FieldVersion, string PostKind, PostNode Values,
     string PressId, string CategoryId, string? OriginPostId, string? SectionId, string? AssigneeId, string CreatedBy,
     DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, string Stage, int Revision, int? AcceptedRevision, string? ReviewNote,
     DateTimeOffset? ArchivedAt, int Version, IReadOnlyList<ContentRevisionInfo> Revisions, IReadOnlyList<ContentHistoryDto> History,

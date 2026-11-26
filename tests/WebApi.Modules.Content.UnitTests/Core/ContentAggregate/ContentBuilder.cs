@@ -16,7 +16,7 @@ public static class ContentBuilder
     public static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     public static PostNode Paragraph(string id, string text) =>
-        new(id, PostKind.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
+        new(id, PostKinds.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
 
     public static PostDocument Document(params PostNode[] children) =>
         new("post.news", 1, Json("""{ "headline": "Final day" }"""), Json("{}"), children);

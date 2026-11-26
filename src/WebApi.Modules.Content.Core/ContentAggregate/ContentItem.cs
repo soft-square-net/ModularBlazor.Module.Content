@@ -35,7 +35,8 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     public string NodeId { get; private set; } = "";
     public string FieldKey { get; private set; } = "";
     public int FieldVersion { get; private set; }
-    public PostKind PostKind { get; private set; }
+    /// <summary>The kind of the post it was made for (a root field key, <see cref="PostKinds"/>), from its node.</summary>
+    public string PostKind { get; private set; } = PostKinds.Article;
     /// <summary>The current values: the node (<see cref="PostNode"/>) as JSON.</summary>
     public string ValuesJson { get; private set; } = "{}";
     public int Revision { get; private set; }

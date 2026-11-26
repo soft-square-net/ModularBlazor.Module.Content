@@ -3809,8 +3809,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
+        public string PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("values")]
         [System.ComponentModel.DataAnnotations.Required]
@@ -4063,8 +4062,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
+        public string PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("pressId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -4265,8 +4263,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         public string? Body { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind? PostKind { get; set; } = default!;
+        public string? PostKind { get; set; } = "post.article";
 
         [System.Text.Json.Serialization.JsonPropertyName("document")]
         public PostDocument? Document { get; set; } = default!;
@@ -4535,8 +4532,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
+        public string PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("pressId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -4654,6 +4650,12 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IDictionary<string, string> Slugs { get; set; } = new System.Collections.Generic.Dictionary<string, string>();
 
+        [System.Text.Json.Serialization.JsonPropertyName("urlPrefix")]
+        public string? UrlPrefix { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("canonicalPath")]
+        public string? CanonicalPath { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -4763,41 +4765,12 @@ namespace soft.square.net.WebApi.Modules.Content.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public enum PostKind
-    {
-
-        [System.Runtime.Serialization.EnumMember(Value = @"Article")]
-        Article = 0,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"News")]
-        News = 1,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"Video")]
-        Video = 2,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"Reportage")]
-        Reportage = 3,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"PhotoStory")]
-        PhotoStory = 4,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"Other")]
-        Other = 5,
-
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class PostNode
     {
 
         [System.Text.Json.Serialization.JsonPropertyName("nodeId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string NodeId { get; set; } = default!;
-
-        [System.Text.Json.Serialization.JsonPropertyName("postKind")]
-        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("schemaId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -4817,6 +4790,10 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.Text.Json.Serialization.JsonPropertyName("children")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<PostNode> Children { get; set; } = new System.Collections.Generic.List<PostNode>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("postKind")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PostKind { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4893,8 +4870,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
+        public string PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("pressId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -5064,8 +5040,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("postKind")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
-        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PostKind>))]
-        public PostKind PostKind { get; set; } = default!;
+        public string PostKind { get; set; } = default!;
 
         [System.Text.Json.Serialization.JsonPropertyName("pressId")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
@@ -5101,6 +5076,12 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.Text.Json.Serialization.JsonPropertyName("servedLanguages")]
         [System.ComponentModel.DataAnnotations.Required]
         public System.Collections.Generic.IReadOnlyList<string> ServedLanguages { get; set; } = new System.Collections.Generic.List<string>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("urlPrefix")]
+        public string? UrlPrefix { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("canonicalPath")]
+        public string? CanonicalPath { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

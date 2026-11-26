@@ -16,7 +16,9 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         post.Property(a => a.Title).HasMaxLength(300);
         post.Property(a => a.OwnerId).HasMaxLength(DataSchemaConstants.UserIdLength);
         post.Property(a => a.State).HasConversion<string>().HasMaxLength(32);
-        post.Property(a => a.PostKind).HasColumnName("Type").HasConversion<string>().HasMaxLength(32).HasDefaultValue(PostKind.Article);
+        // The kind, a DynamicFields root field key (the enum names were migrated to keys by PostKindsAsFieldKeys).
+        post.Property(a => a.PostKind).HasColumnName("Type").HasMaxLength(PostKinds.MaxLength).HasDefaultValue(PostKinds.Article);
+        post.Property(a => a.PublishedUrlPrefix).HasMaxLength(UrlPrefixes.MaxLength);
         post.Property(a => a.PublicId).HasMaxLength(32);
         post.Property(a => a.SchemaId).HasMaxLength(128).HasDefaultValue("legacy.basic");
         post.Property(a => a.SchemaVersion).HasDefaultValue(1);

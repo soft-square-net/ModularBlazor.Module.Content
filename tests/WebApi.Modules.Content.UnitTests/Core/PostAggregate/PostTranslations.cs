@@ -13,7 +13,7 @@ public class PostTranslations
     private static PostDocument Document(string headline = "Final day at the venue", string caption = "The venue") => new(
         "post.news", 1,
         Json($$"""{ "headline": "{{headline}}", "section": "sports" }"""), Json("{}"),
-        [new PostNode("img1", PostKind.Article, "block.image", 1,
+        [new PostNode("img1", PostKinds.Article, "block.image", 1,
             Json($$"""{ "asset": "asset_21", "caption": "{{caption}}", "tags": ["final", "venue"] }"""), Json("{}"), [])]);
 
     private static Dictionary<string, IReadOnlyDictionary<string, TranslatedText>> Arabic(params (string Node, string Key, string Json)[] values) =>

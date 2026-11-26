@@ -29,7 +29,7 @@ public sealed class LiveNudges : IDisposable
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     private static PostNode Paragraph(string id, string text) =>
-        new(id, PostKind.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
+        new(id, PostKinds.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
 
     private async Task<Category> SeedCategoryAsync()
     {
@@ -53,7 +53,7 @@ public sealed class LiveNudges : IDisposable
             context.Contents.Add(content);
         }
         var root = new PostDocument("post.news", 1, Json("""{ "headline": "Final day" }"""), Json("{}"), []);
-        var post = Post.Create("owner-1", category, "A title", "", Now, PostKind.News,
+        var post = Post.Create("owner-1", category, "A title", "", Now, PostKinds.News,
             PostComposition.Working(root, [content.Id], new Dictionary<Guid, ContentItem> { [content.Id] = content }),
             [new ContentRef(content.Id)], publicId);
         context.Posts.Add(post);

@@ -5,11 +5,13 @@ using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate.Specifications;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specifications;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
+using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
 
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 
 /// <summary>Reads one Post as the caller may see it, and maps it to <see cref="PostDetail"/>.</summary>
-public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<ContentItem> contents, PostAccess access, IOptions<ContentOptions> options)
+public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<ContentItem> contents, PostAccess access, IOptions<ContentOptions> options,
+    PostKindRules kinds)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -21,7 +23,8 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
         if (!await SeesAsync(post, ct)) return NotFound(id);
         var ids = post.ContentLinks.Select(c => c.ContentId).ToList();
         var items = ids.Count == 0 ? [] : (await contents.ListAsync(new ContentsByIdsSpec(ids), ct) ?? []).ToDictionary(c => c.Id);
-        return ToDetail(post, items);
+        var prefix = await kinds.UrlPrefixOrNullAsync(post.PostKind, ct) ?? post.PublishedUrlPrefix;
+        return ToDetail(post, items, prefix);
     }
 
     /// <summary>Whether the caller may see the post (for its feed).</summary>
@@ -47,7 +50,7 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
             c.AssigneeId, c.Revision, c.AcceptedRevision, c.ReviewNote, c.Version, c.IsArchived,
             link.PinnedRevision is { } pinned && c.AcceptedRevision is { } accepted && accepted > pinned);
 
-    private PostDetail ToDetail(Post a, IReadOnlyDictionary<Guid, ContentItem> items) => new(a.Id, a.PostKind, a.PressId, a.CategoryId, a.Title, a.Body, a.OwnerId, a.State, a.Version,
+    private PostDetail ToDetail(Post a, IReadOnlyDictionary<Guid, ContentItem> items, string? urlPrefix) => new(a.Id, a.PostKind, a.PressId, a.CategoryId, a.Title, a.Body, a.OwnerId, a.State, a.Version,
         a.CreatedAt, a.UpdatedAt, a.SubmittedAt, a.OwnerMayEdit(access.Now, options.Value.OwnerEditWindow), a.AcceptedBy,
         a.AcceptedAt, a.AcceptedShiftId, a.AssigneeId,
         a.AssignedShiftId, a.ReviewerId, a.ScheduledFor, a.ScheduledBy, a.PublishedAt, a.PublishedBy,
@@ -57,5 +60,6 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
         ReadDocument(a.DocumentJson, a.Title, a.Body, $"Post {a.Id} has an invalid document."),
         a.Translations,
         a.Contents.Select(link => ToDto(link, items.GetValueOrDefault(link.ContentId))).ToList(),
-        a.Slugs.OrderBy(s => s.Culture).ToDictionary(s => s.Culture, s => s.Slug));
+        a.Slugs.OrderBy(s => s.Culture).ToDictionary(s => s.Culture, s => s.Slug),
+        urlPrefix, a.CanonicalPath());
 }

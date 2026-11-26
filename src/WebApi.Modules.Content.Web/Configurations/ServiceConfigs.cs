@@ -30,6 +30,7 @@ public static class ServiceConfigs
         services.AddScoped<PostEditors>();
         services.AddScoped<DeskPublishing>();
         services.AddScoped<PostContentEditing>();
+        services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds.PostKindRules>();
 
         // Shared contents, the pipeline and the change feed.
         services.AddScoped<ContentPipelines>();

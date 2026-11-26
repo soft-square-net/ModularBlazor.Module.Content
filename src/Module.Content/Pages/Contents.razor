@@ -74,9 +74,9 @@
             <label class="mud-input-label" for="ct-kind">@L["Kind"]</label>
             <div class="mud-input-wrapper mud-input-wrapper--select">
               <select id="ct-kind" class="mud-input-slot" @bind="_form.Kind">
-                @foreach (var kind in Enum.GetValues<PostKind>())
+                @foreach (var kind in KnownKinds)
                 {
-                  <option value="@kind">@Words(kind)</option>
+                  <option value="@kind">@KindName(kind)</option>
                 }
               </select>
             </div>
@@ -112,7 +112,7 @@
   private sealed class PostForm
   {
     public string CategoryId { get; set; } = "";
-    public PostKind Kind { get; set; } = PostKind.Article;
+    public string Kind { get; set; } = "post.article";
     public string Title { get; set; } = "";
     public string? Body { get; set; }
   }
@@ -121,7 +121,7 @@
   [
     new { key = "id", title = L["#"].Value, type = "number", width = "80px" },
     new { key = "title", title = L["Title"].Value },
-    new { key = "kind", title = L["Kind"].Value, type = "enum", options = Enum.GetValues<PostKind>().Select(k => Words(k)).ToArray(), width = "130px" },
+    new { key = "kind", title = L["Kind"].Value, type = "enum", options = KnownKinds.Select(KindName).ToArray(), width = "130px" },
     new { key = "category", title = L["Category"].Value },
     new { key = "state", title = L["State"].Value, type = "enum", options = Enum.GetValues<PostState>().Select(s => Words(s)).ToArray(), width = "170px" },
     new { key = "scheduled", title = L["Scheduled for"].Value },
@@ -156,7 +156,7 @@
   {
     id = p.Id.ToString(),
     title = p.Title,
-    kind = Words(p.PostKind),
+    kind = KindName(p.PostKind),
     category = $"{PressName(p.PressId)} / {CategoryName(p.CategoryId)}",
     state = Words(p.State),
     scheduled = When(p.ScheduledFor),

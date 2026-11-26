@@ -10,5 +10,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/WebApi.Modules.Content.UnitTests/WebApi.Modules.Content.UnitTests.csproj" />
     <Project Path="tests/WebApi.Modules.Content.IntegrationTests/WebApi.Modules.Content.IntegrationTests.csproj" />
+    <Project Path="tests/WebApi.Modules.Content.MigrationTests/WebApi.Modules.Content.MigrationTests.csproj" />
   </Folder>
 </Solution>

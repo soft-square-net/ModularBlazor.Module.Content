@@ -1674,7 +1674,7 @@
             "format": "int32"
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string"
           },
           "values": {
             "$ref": "#/components/schemas/PostNode"
@@ -1936,7 +1936,7 @@
             "format": "int32"
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string"
           },
           "pressId": {
             "type": "string"
@@ -2173,7 +2173,8 @@
             ]
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string",
+            "default": "post.article"
           },
           "document": {
             "oneOf": [
@@ -2488,7 +2489,9 @@
           "document",
           "translations",
           "contents",
-          "slugs"
+          "slugs",
+          "urlPrefix",
+          "canonicalPath"
         ],
         "type": "object",
         "properties": {
@@ -2497,7 +2500,7 @@
             "format": "int32"
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string"
           },
           "pressId": {
             "type": "string"
@@ -2659,6 +2662,18 @@
             "additionalProperties": {
               "type": "string"
             }
+          },
+          "urlPrefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "canonicalPath": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2757,34 +2772,20 @@
           }
         }
       },
-      "PostKind": {
-        "enum": [
-          "Article",
-          "News",
-          "Video",
-          "Reportage",
-          "PhotoStory",
-          "Other"
-        ],
-        "type": "string"
-      },
       "PostNode": {
         "required": [
           "nodeId",
-          "postKind",
           "schemaId",
           "schemaVersion",
           "content",
           "style",
-          "children"
+          "children",
+          "postKind"
         ],
         "type": "object",
         "properties": {
           "nodeId": {
             "type": "string"
-          },
-          "postKind": {
-            "$ref": "#/components/schemas/PostKind"
           },
           "schemaId": {
             "type": "string"
@@ -2804,6 +2805,9 @@
             "items": {
               "$ref": "#/components/schemas/PostNode"
             }
+          },
+          "postKind": {
+            "type": "string"
           }
         }
       },
@@ -2865,7 +2869,7 @@
             "format": "int32"
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string"
           },
           "pressId": {
             "type": "string"
@@ -3021,7 +3025,9 @@
           "schemaVersion",
           "document",
           "languages",
-          "servedLanguages"
+          "servedLanguages",
+          "urlPrefix",
+          "canonicalPath"
         ],
         "type": "object",
         "properties": {
@@ -3036,7 +3042,7 @@
             "type": "string"
           },
           "postKind": {
-            "$ref": "#/components/schemas/PostKind"
+            "type": "string"
           },
           "pressId": {
             "type": "string"
@@ -3072,6 +3078,18 @@
             "items": {
               "type": "string"
             }
+          },
+          "urlPrefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "canonicalPath": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

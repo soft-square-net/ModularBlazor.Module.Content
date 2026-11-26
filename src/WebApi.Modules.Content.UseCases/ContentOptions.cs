@@ -11,4 +11,13 @@ public sealed class ContentOptions
     /// reader has already passed.
     /// </summary>
     public TimeSpan EventDelay { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// The gateway's internal address, where this module calls DynamicFields (<c>{ApiBaseUrl}/api/dynamicfields/...</c>) for
+    /// the post kinds. Always over HTTP: modules load in isolated contexts and never call each other in process.
+    /// </summary>
+    public string ApiBaseUrl { get; set; } = "http://localhost:5080";
+
+    /// <summary>How long the tenant's post kinds (DynamicFields' root post fields) stay cached, in seconds (0: not cached). Default 60.</summary>
+    public int PostKindCacheSeconds { get; set; } = 60;
 }

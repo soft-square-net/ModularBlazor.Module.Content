@@ -36,7 +36,8 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public string SchemaId { get; private set; } = "legacy.basic";
     public int SchemaVersion { get; private set; } = 1;
     public string DocumentJson { get; private set; } = "{}";
-    public PostKind PostKind { get; private set; } = PostKind.Article;
+    /// <summary>The post's kind: a DynamicFields root post field key (<see cref="PostKinds"/>), such as <c>post.news</c>.</summary>
+    public string PostKind { get; private set; } = PostKinds.Article;
     public string OwnerId { get; private set; } = "";
     public PostState State { get; private set; }
     public int Version { get; private set; }
@@ -62,6 +63,12 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public string? PublishedBody { get; private set; }
     /// <summary>Immutable document snapshot for the currently published version.</summary>
     public string? PublishedDocumentJson { get; private set; }
+    /// <summary>
+    /// The URL prefix of the kind when the live version was published (its DynamicFields root field's), so the public read
+    /// needs no call to DynamicFields: the canonical path is <c>/{prefix}/{slug}</c>. Null for posts published before kinds
+    /// had prefixes, until they are published again.
+    /// </summary>
+    public string? PublishedUrlPrefix { get; private set; }
     /// <summary>The document's translations (<see cref="PostTranslation"/> list, JSON): overlays of its text, one per language.</summary>
     public string TranslationsJson { get; private set; } = "[]";
     /// <summary>The translations of the published document, taken with it when it is published.</summary>
@@ -88,17 +95,17 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// <summary>A new public id (a new post's contents are made before it, and name it as their origin).</summary>
     public static string NewPublicId() => Guid.NewGuid().ToString("N");
 
-    public static Post Create(string ownerId, Category category, string title, string body, DateTimeOffset now, PostKind postKind = PostKind.Article,
+    public static Post Create(string ownerId, Category category, string title, string body, DateTimeOffset now, string postKind = PostKinds.Article,
         PostDocument? document = null, IReadOnlyList<ContentRef>? contents = null, string? publicId = null)
     {
-        if (!Enum.IsDefined(postKind)) throw new DomainException($"Unsupported postKind '{postKind}'.");
+        var kind = PostKinds.Require(postKind);
         var post = new Post
         {
             OwnerId = Require(ownerId, "an owner"),
             PublicId = publicId ?? NewPublicId(),
             PressId = category.PressId,
             CategoryId = category.Id,
-            PostKind = postKind,
+            PostKind = kind,
             State = PostState.Draft,
             CreatedAt = now,
             UpdatedAt = now
@@ -351,23 +358,26 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// Desk publishes now. A post with contents needs the <paramref name="plan"/>: every required content pinned to an accepted
     /// revision, and the document assembled from the pinned revisions.
     /// </summary>
-    public void Publish(string actor, DateTimeOffset now, PublishPlan? plan = null)
+    /// <param name="urlPrefix">The kind's URL prefix now (the application layer refuses to publish a kind without one).</param>
+    public void Publish(string actor, DateTimeOffset now, PublishPlan? plan = null, string? urlPrefix = null)
     {
         Expect("publish", PostState.Approved, PostState.AwaitingDeskReapproval, PostState.Scheduled);
         var pinned = RequirePins(plan?.Pins);
         var document = PublishedDocument(plan?.Document);
-        Change(actor, "published", now, () => { Pin(pinned); MarkPublished(actor, now, document)(); });
+        var prefix = UrlPrefixOrNull(urlPrefix);
+        Change(actor, "published", now, () => { Pin(pinned); MarkPublished(actor, now, document, prefix)(); });
     }
 
     /// <summary>
     /// Publishes a scheduled Post whose time has come, if it is still the version Desk scheduled (its right was
     /// checked when it was scheduled). False when nothing is due.
     /// </summary>
-    public bool PublishIfDue(string actor, DateTimeOffset now, PostDocument? pinnedDocument = null)
+    public bool PublishIfDue(string actor, DateTimeOffset now, PostDocument? pinnedDocument = null, string? urlPrefix = null)
     {
         if (!IsDue(now)) return false;
         var document = PublishedDocument(pinnedDocument);
-        Change(actor, "published (scheduled)", now, MarkPublished(ScheduledBy ?? actor, now, document), $"scheduled by {ScheduledBy}");
+        var prefix = UrlPrefixOrNull(urlPrefix);
+        Change(actor, "published (scheduled)", now, MarkPublished(ScheduledBy ?? actor, now, document, prefix), $"scheduled by {ScheduledBy}");
         return true;
     }
 
@@ -375,8 +385,32 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public bool IsDue(DateTimeOffset now) =>
         State == PostState.Scheduled && ScheduledFor is { } due && due <= now && ScheduledVersion == Version;
 
-    private Action MarkPublished(string publisher, DateTimeOffset now, string document) => () =>
+    /// <summary>
+    /// The canonical path of the live version, <c>/{prefix}/{slug}</c> (the prefix kept when it was published); null until it
+    /// is published under a prefix. The slug is the one of the first of <paramref name="cultures"/> the post has a slug in,
+    /// else of its first culture (ordinal order), else its public id.
+    /// </summary>
+    public string? CanonicalPath(IEnumerable<string>? cultures = null) =>
+        PublishedAt is null || string.IsNullOrWhiteSpace(PublishedUrlPrefix) ? null : $"/{PublishedUrlPrefix}/{PathSlug(cultures)}";
+
+    /// <summary>The last segment of the post's URL: its slug in the first matching culture, else its first slug, else its public id.</summary>
+    public string PathSlug(IEnumerable<string>? cultures = null)
     {
+        foreach (var culture in cultures ?? [])
+            if (_slugs.FirstOrDefault(s => string.Equals(s.Culture, culture, StringComparison.OrdinalIgnoreCase)) is { } match) return match.Slug;
+        return _slugs.OrderBy(s => s.Culture, StringComparer.Ordinal).FirstOrDefault()?.Slug ?? StablePublicId;
+    }
+
+    private static string? UrlPrefixOrNull(string? urlPrefix)
+    {
+        if (string.IsNullOrWhiteSpace(urlPrefix)) return null;
+        var prefix = urlPrefix.Trim();
+        return UrlPrefixes.IsValid(prefix) ? prefix : throw new DomainException($"'{urlPrefix}' is not a URL prefix such as news or ar/news.");
+    }
+
+    private Action MarkPublished(string publisher, DateTimeOffset now, string document, string? urlPrefix) => () =>
+    {
+        PublishedUrlPrefix = urlPrefix;
         State = PostState.Published;
         PublishedAt = now;
         PublishedBy = publisher;

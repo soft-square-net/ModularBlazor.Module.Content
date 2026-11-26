@@ -6,5 +6,5 @@ namespace soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specificatio
 /// </summary>
 public sealed class PublishedPostByPublicIdSpec : SingleResultSpecification<Post>
 {
-    public PublishedPostByPublicIdSpec(string publicId) => Query.Where(p => p.PublicId == publicId && p.PublishedAt != null).AsNoTracking();
+    public PublishedPostByPublicIdSpec(string publicId) => Query.Where(p => p.PublicId == publicId && p.PublishedAt != null).Include(p => p.Slugs).AsNoTracking();
 }

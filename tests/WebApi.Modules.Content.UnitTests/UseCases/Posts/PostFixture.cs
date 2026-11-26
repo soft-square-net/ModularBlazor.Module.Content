@@ -5,6 +5,7 @@ using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.UseCases;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
+using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
 
 namespace soft.square.net.WebApi.Modules.Content.UnitTests.UseCases.Posts;
 
@@ -23,6 +24,9 @@ public sealed class PostFixture
     public TestClock Clock { get; } = new();
     public IOptions<ContentOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new ContentOptions());
 
+    public FakePostKindCatalog KindCatalog { get; } = new();
+    public PostKindRules Kinds { get; }
+
     public PostAccess PostAccess { get; }
     public PostDetails Details { get; }
     public PostChanges Changes { get; }
@@ -40,7 +44,8 @@ public sealed class PostFixture
     {
         Access.UserId.Returns(userId);
         PostAccess = new PostAccess(Access, Grants, Clock);
-        Details = new PostDetails(Reader, ContentReader, PostAccess, Options);
+        Kinds = new PostKindRules(KindCatalog, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
+        Details = new PostDetails(Reader, ContentReader, PostAccess, Options, Kinds);
         Changes = new PostChanges(Posts, Details);
         Pipelines = new ContentPipelines(Store);
         ContentAccess = new ContentAccess(PostAccess);

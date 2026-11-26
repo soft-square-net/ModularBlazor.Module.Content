@@ -34,9 +34,9 @@ public class SharedContentHandlers
             _fixture.Stored(saved);
             return saved;
         });
-        var handler = new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details);
+        var handler = new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds);
 
-        var result = await handler.Handle(new CreatePostCommand("politics", "A title", "", PostKind.News, Document(children)), Ct);
+        var result = await handler.Handle(new CreatePostCommand("politics", "A title", "", PostKinds.News, Document(children)), Ct);
 
         result.IsSuccess.ShouldBeTrue();
         return saved!;
@@ -71,7 +71,7 @@ public class SharedContentHandlers
     {
         _fixture.SignIn(PostBuilder.Desk);
         _fixture.Allow(ContentPermissions.Publish);
-        return new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk).Handle(new PublishPostCommand(post.Id, post.Version), Ct).AsTask();
+        return new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds).Handle(new PublishPostCommand(post.Id, post.Version), Ct).AsTask();
     }
 
     [Fact]
