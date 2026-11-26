@@ -11,6 +11,7 @@ using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
 using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
+using soft.square.net.WebApi.Modules.Content.Core.PipelineAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PressAggregate;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
@@ -27,6 +28,9 @@ namespace soft.square.net.WebApi.Modules.Content.MigrationTests;
 /// <item>the data step of <c>UnitsAndCategories</c>: posts and contents keep their unit, a post its categories; down and
 /// up again, a post's single category (<c>articles.CategoryId</c>) becomes its <c>post_categories</c> row and each category's
 /// Arabic name starts as its English one;</item>
+/// <item>the data step of <c>WorkItemStages</c>: down, a content in a stage that did not exist (in-progress) goes back to the
+/// old start stage (draft); up, the old keys become the work-item states, in the contents and in a published pipeline
+/// (rejected → returned in both);</item>
 /// <item>the integration outbox and inbox tables exist (Content publishes and subscribes);</item>
 /// <item>every migration's Down runs (down to an empty schema), and every Up again.</item>
 /// </list>
@@ -41,6 +45,9 @@ public abstract class MigrationHarness
 
     /// <summary>The migration of the post categories, the category names and the units.</summary>
     private const string UnitsMigration = "_UnitsAndCategories";
+
+    /// <summary>The migration of the stage keys to the work-item states.</summary>
+    private const string StagesMigration = "_WorkItemStages";
 
     private static readonly Guid Root = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid Desk = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -104,6 +111,41 @@ public abstract class MigrationHarness
             (await context.Categories.AsNoTracking().SingleAsync(c => c.Id == "politics", Ct)).NameAr.ShouldBe("السياسة");
             (await Count(context, "integration_outbox")).ShouldBe(0);
             (await Count(context, "integration_inbox")).ShouldBe(0);
+        }
+
+        // 2b. The stage keys: down to before WorkItemStages (in-progress is the old start stage, draft), up again (assigned).
+        await using (var context = Context(connection))
+        {
+            (await Scalar(context, "contents", "Stage")).ShouldBe("in-progress");
+            await context.GetService<IMigrator>().MigrateAsync(Before(context, StagesMigration), Ct);
+            (await Scalar(context, "contents", "Stage")).ShouldBe("draft");
+        }
+        await using (var context = Context(connection))
+        {
+            await context.Database.MigrateAsync(Ct);
+            (await Scalar(context, "contents", "Stage")).ShouldBe("assigned");
+        }
+        // ... and with a pipeline Elsa published with the old keys: both its definition and the content's stage are renamed.
+        await using (var context = Context(connection))
+        {
+            await context.GetService<IMigrator>().MigrateAsync(Before(context, StagesMigration), Ct);
+            context.Pipelines.Add(Pipeline.Create(LegacyPipeline, "elsa", Now));
+            await context.SaveChangesAsync(Ct);
+            var sql = $"UPDATE {Table("contents")} SET {Column("Stage")} = 'rejected'"; // names only, from this class
+            await context.Database.ExecuteSqlRawAsync(sql, Ct);
+        }
+        await using (var context = Context(connection))
+        {
+            await context.Database.MigrateAsync(Ct);
+            (await Scalar(context, "contents", "Stage")).ShouldBe("returned");
+            var json = await Scalar(context, "pipelines", "DefinitionJson");
+            json.ShouldNotContain("\"rejected\"");
+            json.ShouldNotContain("\"draft\"");
+            var pipeline = (await context.Pipelines.AsNoTracking().SingleAsync(Ct)).Definition;
+            pipeline.StartStage.ShouldBe("assigned");
+            pipeline.Stages.Select(s => s.Key).ShouldBe(["assigned", "submitted", "accepted", "returned"]);
+            pipeline.Action("reject").To.ShouldBe("returned");
+            pipeline.Validate();
         }
 
         // 3. Down to the step before the units migration, and up again: the primary category becomes the post's row of
@@ -187,7 +229,7 @@ public abstract class MigrationHarness
         var category = Category.Create("politics", "daily", "Politics", "السياسة");
         var economy = Category.Create("economy", "daily", "Economy");
         var node = new PostNode("n1", PostKinds.PhotoStory, "block.paragraph", 1, Json("""{ "text": "One" }"""), Json("{}"), []);
-        var content = ContentItem.Create("owner-1", "daily", "politics", null, node, "draft", Now);
+        var content = ContentItem.Create("owner-1", "daily", "politics", null, node, "in-progress", Now);
         content.ChangeUnit("workflow", Desk, DeskPath, Now);
         var document = new PostDocument("post.video", 1, Json("""{ "headline": "A title" }"""), Json("{}"), [node]);
         // A body: Oracle stores '' as NULL, and Body is required (a known gap, see the C1 handover).
@@ -196,6 +238,30 @@ public abstract class MigrationHarness
         context.AddRange(press, category, economy, content, post);
         await context.SaveChangesAsync(Ct);
     }
+
+    /// <summary>The migration just before the one whose id ends with <paramref name="name"/>.</summary>
+    private static string Before(ContentDbContext context, string name)
+    {
+        var all = context.Database.GetMigrations().ToList();
+        var index = all.FindIndex(m => m.EndsWith(name, StringComparison.Ordinal));
+        index.ShouldBeGreaterThan(0, $"the migration {name} exists");
+        return all[index - 1];
+    }
+
+    /// <summary>The first built-in pipeline, as Elsa may have published it before the stages were renamed.</summary>
+    private static PipelineDefinition LegacyPipeline { get; } = new("newsroom", "draft",
+    [
+        new("draft", StageKind.Work, ["assignee"]),
+        new("desk", StageKind.Review, ["content.publish"]),
+        new("accepted", StageKind.Accepted, ["content.publish"], OnEdit: "desk"),
+        new("rejected", StageKind.Work, ["assignee"])
+    ],
+    [
+        new("submit", ["draft", "rejected"], "desk", ["assignee"]),
+        new("accept", ["desk"], "accepted", ["content.publish"], Pins: true),
+        new("reject", ["desk", "accepted"], "rejected", ["content.publish", "content.return"], RequiresNote: true),
+        new("reopen", ["accepted"], "desk", ["content.publish"])
+    ]);
 
     /// <summary>The values of a column of a table, every row.</summary>
     private async Task<List<string>> Scalars(ContentDbContext context, string table, string column)

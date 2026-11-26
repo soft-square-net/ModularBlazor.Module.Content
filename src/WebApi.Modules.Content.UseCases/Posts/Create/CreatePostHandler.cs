@@ -1,13 +1,18 @@
 using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
+using soft.square.net.WebApi.Modules.Content.UseCases.Events;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
 
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts.Create;
 
-/// <summary>A new draft; each child of its document becomes a shared content of the post (in the pipeline's start stage).</summary>
+/// <summary>
+/// A new draft; each child of its document becomes a shared content of the post (in the pipeline's start stage). One
+/// transaction: the post and its contents, then <c>content.post-created.v1</c> (it needs the post's id, which the first
+/// save gives).
+/// </summary>
 public sealed class CreatePostHandler(IReadRepository<Category> categories, IRepository<Post> posts, IContentStore store, PostDocumentSplit split,
-    PostAccess access, PostDetails details, PostKindRules kinds)
+    PostAccess access, PostDetails details, PostKindRules kinds, ContentEventPublisher events)
     : ICommandHandler<CreatePostCommand, Result<PostDetail>>
 {
     public async ValueTask<Result<PostDetail>> Handle(CreatePostCommand command, CancellationToken ct)
@@ -37,7 +42,12 @@ public sealed class CreatePostHandler(IReadRepository<Category> categories, IRep
         var (document, contents, created) = await split.CreateAsync(access.Me, category.PressId, category.Id, publicId, command.Document, access.Now, ct);
         var post = Post.Create(access.Me, category, command.Title, command.Body, access.Now, kind.Value.Key, document, contents, publicId, others);
         foreach (var content in created) store.Add(content);
-        await posts.AddAsync(post, ct); // one save: the post and its contents
+        await store.InTransactionAsync(async () =>
+        {
+            await posts.AddAsync(post, ct); // the post and its contents
+            events.PostCreated(post);
+            await store.SaveChangesAsync(ct);
+        }, ct);
         return await details.GetAsync(post.Id, ct);
     }
 }

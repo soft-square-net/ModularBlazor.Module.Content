@@ -29,7 +29,7 @@ public class PostKindHandlers
             _fixture.Stored(saved);
             return saved;
         });
-        return new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds)
+        return new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds, _fixture.Publisher)
             .Handle(new CreatePostCommand("politics", "A title", "", kind, null), Ct).AsTask();
     }
 
@@ -49,7 +49,7 @@ public class PostKindHandlers
     }
 
     private Task<Result<PostDetail>> PublishAsync(Post post) =>
-        new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds)
+        new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds, _fixture.Validation)
             .Handle(new PublishPostCommand(post.Id, post.Version), Ct).AsTask();
 
     [Fact]
@@ -109,7 +109,7 @@ public class PostKindHandlers
         published.Errors.ShouldHaveSingleItem().ShouldContain("cannot be published yet");
         post.State.ShouldBe(PostState.AwaitingDeskReapproval);
 
-        var scheduled = await new SchedulePostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds)
+        var scheduled = await new SchedulePostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds, _fixture.Validation)
             .Handle(new SchedulePostCommand(post.Id, post.Version, _fixture.Clock.Now.AddHours(1)), Ct);
         scheduled.Status.ShouldBe(ResultStatus.Conflict);
 

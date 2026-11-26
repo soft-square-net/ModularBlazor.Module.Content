@@ -10,7 +10,8 @@ public sealed class Approve : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/approve", HandleAsync)
-            .RequirePermission(ContentPermissions.Review);
+            .RequirePermission(ContentPermissions.Review)
+            .ProducesValidationFailure();
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, VersionRequest r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new ApprovePostCommand(id, r.Version), ct)).ToOkResult();

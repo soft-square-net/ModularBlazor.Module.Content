@@ -17,6 +17,8 @@ public sealed class FakeContentStore : IContentStore
     public List<FeedEntry> Feed { get; } = [];
     public Pipeline? Pipeline { get; set; }
     public int Saves { get; private set; }
+    /// <summary>When set, a save also hands its events to the integration publisher (as FeedEventsToOutbox and WorkItemsToOutbox do).</summary>
+    public soft.square.net.WebApi.Modules.Content.UseCases.Events.ContentEventPublisher? Publisher { get; set; }
 
     public void Add(ContentItem content) => Contents.Add(content);
     public void Remove(ContentItem content) => Contents.Remove(content);
@@ -58,12 +60,27 @@ public sealed class FakeContentStore : IContentStore
     public Task<IReadOnlyList<FeedEntry>> FeedAsync(long after, DateTimeOffset notAfter, int take, int? postId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<FeedEntry>>(Feed.Take(take).ToList());
 
+    public int Transactions { get; private set; }
+
+    public async Task InTransactionAsync(Func<Task> work, CancellationToken ct)
+    {
+        Transactions++;
+        await work();
+    }
+
     public Task SaveChangesAsync(CancellationToken ct)
     {
         Saves++;
         foreach (var owner in Contents.Cast<IHasDomainEvents>().Concat(Posts))
-            foreach (var e in owner.TakeDomainEvents().OfType<FeedEvent>())
-                Feed.Add(FeedEntry.From(e));
+            foreach (var e in owner.TakeDomainEvents())
+            {
+                if (e is FeedEvent feed)
+                {
+                    Feed.Add(FeedEntry.From(feed));
+                    Publisher?.Feed(feed);
+                }
+                else if (e is ContentWorkItemChanged change) Publisher?.WorkItem(change);
+            }
         return Task.CompletedTask;
     }
 }

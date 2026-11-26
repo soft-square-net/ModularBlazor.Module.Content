@@ -40,23 +40,58 @@ public sealed record PipelineDefinition(string Key, string StartStage, IReadOnly
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// The built-in newsroom pipeline: a section works on a content (<c>draft</c>), submits it to the Desk (<c>desk</c>),
-    /// the Desk accepts it (pinning the revision) or rejects it with a note (<c>rejected</c>, back to the section).
-    /// The Desk may edit in <c>desk</c> and <c>accepted</c>; an edit of an accepted content sends it back to <c>desk</c>.
+    /// The built-in newsroom pipeline, whose stage keys are the work-item states other modules see
+    /// (<see cref="PipelineStageKeys"/>): a content starts <c>assigned</c> to its section or person, is worked on
+    /// (<c>in-progress</c>, by its first edit or <c>start</c>), handed in (<c>submitted</c>), taken up by the Desk
+    /// (<c>in-review</c>), then accepted (pinning the revision) or returned with a note (<c>returned</c>, back to the section).
+    /// The Desk may edit in its stages; an edit of an accepted content sends it back to <c>in-review</c>.
     /// </summary>
-    public static PipelineDefinition Default { get; } = new("newsroom", "draft",
+    public static PipelineDefinition Default { get; } = new("newsroom", PipelineStageKeys.Assigned,
     [
-        new("draft", StageKind.Work, [Assignee]),
-        new("desk", StageKind.Review, ["content.publish"]),
-        new("accepted", StageKind.Accepted, ["content.publish"], OnEdit: "desk"),
-        new("rejected", StageKind.Work, [Assignee])
+        new(PipelineStageKeys.Assigned, StageKind.Work, [Assignee], OnEdit: PipelineStageKeys.InProgress),
+        new(PipelineStageKeys.InProgress, StageKind.Work, [Assignee]),
+        new(PipelineStageKeys.Submitted, StageKind.Review, ["content.publish"]),
+        new(PipelineStageKeys.InReview, StageKind.Review, ["content.publish"]),
+        new(PipelineStageKeys.Accepted, StageKind.Accepted, ["content.publish"], OnEdit: PipelineStageKeys.InReview),
+        new(PipelineStageKeys.Returned, StageKind.Work, [Assignee], OnEdit: PipelineStageKeys.InProgress)
     ],
     [
-        new("submit", ["draft", "rejected"], "desk", [Assignee]),
-        new("accept", ["desk"], "accepted", ["content.publish"], Pins: true),
-        new("reject", ["desk", "accepted"], "rejected", ["content.publish", "content.return"], RequiresNote: true),
-        new("reopen", ["accepted"], "desk", ["content.publish"])
+        new("start", [PipelineStageKeys.Assigned, PipelineStageKeys.Returned], PipelineStageKeys.InProgress, [Assignee]),
+        new("submit", [PipelineStageKeys.Assigned, PipelineStageKeys.InProgress, PipelineStageKeys.Returned], PipelineStageKeys.Submitted, [Assignee]),
+        new("review", [PipelineStageKeys.Submitted], PipelineStageKeys.InReview, ["content.publish"]),
+        new("accept", [PipelineStageKeys.Submitted, PipelineStageKeys.InReview], PipelineStageKeys.Accepted, ["content.publish"], Pins: true),
+        new("return", [PipelineStageKeys.Submitted, PipelineStageKeys.InReview, PipelineStageKeys.Accepted], PipelineStageKeys.Returned,
+            ["content.publish", "content.return"], RequiresNote: true),
+        new("reopen", [PipelineStageKeys.Accepted], PipelineStageKeys.InReview, ["content.publish"])
     ]);
+
+    /// <summary>
+    /// The definition with the stage keys of the first built-in pipeline renamed to today's (<see cref="PipelineStageKeys.Legacy"/>:
+    /// draft → assigned, desk → submitted, rejected → returned; accepted stays). Elsa may still publish the old keys, so
+    /// <c>PUT /pipeline</c> renames them; a legacy key is kept when the definition already has a stage with its new key.
+    /// </summary>
+    public PipelineDefinition WithCurrentStageKeys()
+    {
+        var keys = Stages?.Where(s => s is not null).Select(s => s.Key).ToHashSet(StringComparer.Ordinal) ?? [];
+        var rename = PipelineStageKeys.Legacy.Where(m => keys.Contains(m.Key) && !keys.Contains(m.Value))
+            .ToDictionary(m => m.Key, m => m.Value, StringComparer.Ordinal);
+        if (rename.Count == 0) return this;
+        string Map(string? key) => key is not null && rename.TryGetValue(key, out var to) ? to : key!;
+        return this with
+        {
+            StartStage = Map(StartStage),
+            Stages = [.. Stages!.Select(s => s is null ? s! : s with { Key = Map(s.Key), OnEdit = s.OnEdit is null ? null : Map(s.OnEdit) })],
+            Actions = [.. (Actions ?? []).Select(a => a is null ? a! : a with { From = [.. (a.From ?? []).Select(Map)], To = Map(a.To) })]
+        };
+    }
+
+    /// <summary>
+    /// The action with this key; a key the first built-in pipeline used (<c>reject</c>, now <c>return</c>) finds today's
+    /// action when the definition has no action of that name.
+    /// </summary>
+    public PipelineAction? FindAction(string key) =>
+        Actions.FirstOrDefault(a => a.Key == key)
+        ?? (PipelineStageKeys.LegacyActions.TryGetValue(key, out var renamed) ? Actions.FirstOrDefault(a => a.Key == renamed) : null);
 
     public PipelineStage Stage(string key) =>
         Stages.FirstOrDefault(s => s.Key == key) ?? throw new DomainException($"The pipeline has no stage '{key}'.");
@@ -64,7 +99,7 @@ public sealed record PipelineDefinition(string Key, string StartStage, IReadOnly
     public PipelineStage? FindStage(string key) => Stages.FirstOrDefault(s => s.Key == key);
 
     public PipelineAction Action(string key) =>
-        Actions.FirstOrDefault(a => a.Key == key) ?? throw new DomainException($"The pipeline has no action '{key}'.");
+        FindAction(key) ?? throw new DomainException($"The pipeline has no action '{key}'.");
 
     /// <summary>The stages of a kind (the first is used where Content picks one itself: the migration, the Desk's publish).</summary>
     public IEnumerable<PipelineStage> OfKind(StageKind kind) => Stages.Where(s => s.Kind == kind);

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -5,7 +6,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using soft.square.net.WebApi.Contracts.Live;
 using soft.square.net.WebApi.Contracts.Tenancy;
+using soft.square.net.WebApi.Contracts.Messaging;
 using soft.square.net.WebApi.Data;
+using soft.square.net.WebApi.Data.Messaging;
+using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
+using soft.square.net.WebApi.Modules.Content.UseCases.Events;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
@@ -41,7 +46,11 @@ public sealed class ContentDatabase : IDisposable
         services.AddScoped<IContentStore>(_ => new ContentStore(context!));
         services.AddScoped<PostContents>();
         services.AddScoped<IDomainEventHandler<FeedEvent>, FeedWriter>();
+        services.AddScoped<IDomainEventHandler<FeedEvent>, FeedEventsToOutbox>();
         services.AddScoped<IDomainEventHandler<FeedEvent>, RecomposePostsOnContentChange>();
+        services.AddScoped<IDomainEventHandler<ContentWorkItemChanged>, WorkItemsToOutbox>();
+        services.AddScoped<IIntegrationEvents>(_ => new OutboxRows(context!));
+        services.AddScoped<ContentEventPublisher>();
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddScoped<IFeedCommitObserver, LivePostPublisher>();
         if (live is not null) services.AddSingleton(live);
@@ -51,6 +60,26 @@ public sealed class ContentDatabase : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+
+    /// <summary>The platform's outbox write: a row of the context's outbox, written by its next save.</summary>
+    private sealed class OutboxRows(ContentDbContext db) : IIntegrationEvents
+    {
+        public IntegrationEnvelope Publish(string type, object data, string subject, string? unitPath = null, string? orgId = null)
+        {
+            var id = Guid.NewGuid();
+            var envelope = new IntegrationEnvelope(id, type, db.CurrentTenantId!, subject, DateTimeOffset.UtcNow, id.ToString("n"), "content",
+                JsonSerializer.SerializeToElement(data, data.GetType(), IntegrationEnvelope.JsonOptions), orgId, unitPath);
+            db.Set<OutboxMessage>().Add(new OutboxMessage
+            {
+                Id = id,
+                Type = type,
+                TenantId = envelope.TenantId,
+                Envelope = JsonSerializer.Serialize(envelope, IntegrationEnvelope.JsonOptions),
+                OccurredAt = envelope.OccurredAt
+            });
+            return envelope;
+        }
+    }
 
     private sealed class TestTenant(string? id) : ITenantContext
     {

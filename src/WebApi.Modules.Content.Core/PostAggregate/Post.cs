@@ -228,6 +228,9 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// <summary>The root of the working document: kind and root values, without the contents.</summary>
     public PostDocument Root => ReadDocument() with { Children = [] };
 
+    /// <summary>The working document: the root with its contents at their current revisions.</summary>
+    public PostDocument Working => ReadDocument();
+
     /// <summary>
     /// The migration's split of a stored document: the post now uses these contents (made from its children, in order,
     /// pinned to their first revision when <paramref name="pinned"/>). No new version and no feed events.
@@ -636,7 +639,7 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         Record(actor, action, now, detail);
         if (State != before) _feed.Add((FeedEventTypes.PostStateChanged, null, action));
         foreach (var (type, contentId, text) in Id == 0 ? [] : _feed)
-            Raise(new FeedEvent(type, Id, contentId, Version, null, null, State.ToString(), actor, now, text));
+            Raise(new FeedEvent(type, Id, contentId, Version, null, null, State.ToString(), actor, now, text, UnitPath));
         _feed.Clear();
     }
 

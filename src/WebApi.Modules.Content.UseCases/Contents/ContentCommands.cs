@@ -3,6 +3,7 @@ using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specifications;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
+using soft.square.net.WebApi.Modules.Content.UseCases.Validation;
 
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 
@@ -91,20 +92,27 @@ public sealed class EditContentHandler(ContentChanges changes, ContentAccess acc
 /// <summary>
 /// Take a pipeline action on a content: <c>Act(contentId, action, expectedVersion, note?)</c>, checked against the tenant's
 /// pipeline (the stage it starts from, who may take it, the note it needs). The Desk's accept pins the current revision.
+/// An action into a review or accepted stage first has DynamicFields check the content (<see cref="ContentValidation"/>:
+/// 422 with the problems, 503 while DynamicFields cannot answer). A key of the first built-in pipeline (<c>reject</c>) still
+/// finds today's action (<c>return</c>).
 /// </summary>
 public sealed record ActOnContentCommand(Guid Id, string Action, int Version, string? Note) : ICommand<Result<ContentDetail>>;
 
-public sealed class ActOnContentHandler(ContentChanges changes, ContentAccess access, ContentPipelines pipelines)
+public sealed class ActOnContentHandler(ContentChanges changes, ContentAccess access, ContentPipelines pipelines, ContentValidation validation)
     : ICommandHandler<ActOnContentCommand, Result<ContentDetail>>
 {
     public async ValueTask<Result<ContentDetail>> Handle(ActOnContentCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async content =>
         {
             var pipeline = await pipelines.CurrentAsync(ct);
-            var action = pipeline.Actions.FirstOrDefault(a => a.Key == command.Action);
+            var action = pipeline.FindAction(command.Action ?? "");
             if (action is null) return Result.Invalid(new ValidationError($"The pipeline has no action '{command.Action}'."));
             var allowed = await access.RequireAsync(content, action.Who, $"{action.Key} this content", ct);
             if (!allowed.IsSuccess) return allowed;
+            if (!action.From.Contains(content.Stage)) // the aggregate's refusal, before DynamicFields is asked
+                return Result.Conflict($"Cannot {action.Key} a content in stage '{content.Stage}'.");
+            var valid = await validation.CheckContentAsync(content, pipeline, action, ct);
+            if (!valid.IsSuccess) return valid;
             content.Act(access.Me, action, command.Note, access.Now);
             return Result.Success();
         }, ct);

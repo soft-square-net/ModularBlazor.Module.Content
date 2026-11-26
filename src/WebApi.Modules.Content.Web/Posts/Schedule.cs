@@ -10,7 +10,8 @@ public sealed class Schedule : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/schedule", HandleAsync)
-            .RequirePermission(ContentPermissions.Publish);
+            .RequirePermission(ContentPermissions.Publish)
+            .ProducesValidationFailure();
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, ScheduleRequest r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new SchedulePostCommand(id, r.Version, r.PublishAt), ct)).ToOkResult();

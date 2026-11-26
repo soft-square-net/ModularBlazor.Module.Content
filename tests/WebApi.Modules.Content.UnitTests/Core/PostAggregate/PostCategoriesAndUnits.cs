@@ -137,5 +137,5 @@ public class PostCategoriesAndUnits
     }
 
     private static ContentItem Content(string? sectionId) =>
-        ContentItem.Create("owner-1", "daily", "politics", null, Paragraph("n1", "One"), "draft", Now, sectionId);
+        ContentItem.Create("owner-1", "daily", "politics", null, Paragraph("n1", "One"), "assigned", Now, sectionId);
 }

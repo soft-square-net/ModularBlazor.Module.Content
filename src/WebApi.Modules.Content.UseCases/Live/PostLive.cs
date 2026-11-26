@@ -1,4 +1,5 @@
 using System.Text.Json;
+using soft.square.net.Content.Contracts;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,10 +17,10 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Live;
 /// </summary>
 public static class PostLive
 {
-    public const string ModuleId = "content";
-    public const string Kind = "post";
+    public const string ModuleId = ContentLiveTopic.Module;
+    public const string Kind = ContentLiveTopic.Kind;
     /// <summary>The type of every message on the topic (the payload says which feed row it is).</summary>
-    public const string MessageType = "post.changed";
+    public const string MessageType = ContentLiveTopic.MessageType;
 
     /// <summary>
     /// Who may subscribe. Content has no single "read a post" permission (a post is seen by its owner, its reviewer and the
@@ -33,8 +34,6 @@ public static class PostLive
     public static string TopicOf(int postId) => LiveTopics.Of(ModuleId, Kind, postId.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }
 
-/// <summary>The message payload: which feed row to read. Small on purpose, the client re-reads the feed.</summary>
-public sealed record PostLiveMessage(long EventId, string Type, Guid? ContentId);
 
 /// <summary>Called once feed rows are committed (the DbContext calls it after the save, or after the save's transaction commits).</summary>
 public interface IFeedCommitObserver
@@ -70,7 +69,7 @@ public sealed class LivePostPublisher(IContentStore store, IServiceProvider serv
             foreach (var entry in entries.OrderBy(e => e.Id))
             {
                 IEnumerable<int> posts = entry.PostId is { } postId ? [postId] : entry.ContentId is { } contentId ? users[contentId] : [];
-                var payload = JsonSerializer.SerializeToElement(new PostLiveMessage(entry.Id, entry.Type, entry.ContentId), Json);
+                var payload = JsonSerializer.SerializeToElement(new ContentLiveMessage(entry.Id, entry.Type, entry.ContentId), Json);
                 foreach (var post in posts.Where(p => p > 0).Distinct())
                 {
                     try

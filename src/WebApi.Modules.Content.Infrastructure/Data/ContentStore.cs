@@ -92,4 +92,19 @@ public sealed class ContentStore(ContentDbContext db) : IContentStore
     }
 
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
+
+    public async Task InTransactionAsync(Func<Task> work, CancellationToken ct)
+    {
+        if (db.Database.CurrentTransaction is not null)
+        {
+            await work();
+            return;
+        }
+        await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await work();
+            await transaction.CommitAsync(ct);
+        });
+    }
 }

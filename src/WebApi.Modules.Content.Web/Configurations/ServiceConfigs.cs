@@ -2,7 +2,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using soft.square.net.WebApi.Modules.Content.Infrastructure;
 using soft.square.net.WebApi.Modules.Content.UseCases;
+using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
+using soft.square.net.WebApi.Modules.Content.UseCases.Events;
+using soft.square.net.WebApi.Modules.Content.UseCases.Validation;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 using soft.square.net.WebApi.Contracts.Live;
@@ -33,7 +36,7 @@ public static class ServiceConfigs
         services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds.PostKindRules>();
         // Units (Organization) and the integration events the post use cases publish.
         services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Units.UnitRules>();
-        services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Events.ContentEventPublisher>();
+        services.AddScoped<ContentEventPublisher>();
 
         // Shared contents, the pipeline and the change feed.
         services.AddScoped<ContentPipelines>();
@@ -44,7 +47,10 @@ public static class ServiceConfigs
         services.AddScoped<PostDocumentSplit>();
         services.AddScoped<FeedReader>();
         services.AddScoped<IDomainEventHandler<FeedEvent>, FeedWriter>(); // first: the outbox row, then the effects
+        services.AddScoped<IDomainEventHandler<FeedEvent>, FeedEventsToOutbox>(); // the same row as an integration event
         services.AddScoped<IDomainEventHandler<FeedEvent>, RecomposePostsOnContentChange>();
+        services.AddScoped<IDomainEventHandler<ContentWorkItemChanged>, WorkItemsToOutbox>(); // content.work-item-*.v1
+        services.AddScoped<ContentValidation>(); // DynamicFields' checks before review, acceptance and publication
 
         // Live: a nudge on content:post:{id} once feed rows are committed, and the post's scopes for the hub's check.
         services.AddScoped<IFeedCommitObserver, LivePostPublisher>();

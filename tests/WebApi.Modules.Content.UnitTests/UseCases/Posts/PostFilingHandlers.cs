@@ -1,3 +1,4 @@
+using soft.square.net.Content.Contracts;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using soft.square.net.Organization.Contracts;
@@ -86,7 +87,7 @@ public class PostFilingHandlers
         result.Value.UnitId.ShouldBe(Desk);
         result.Value.UnitPath.ShouldBe(DeskPath);
         post.Scopes.ShouldContain(UnitScopes.Of(PostCategoriesAndUnits.Root));
-        _events.Received(1).Publish(ContentEvents.PostUnitChanged,
+        _events.Received(1).Publish(ContentEventTypes.PostUnitChanged,
             Arg.Is<PostUnitChanged>(e => e.PostId == 7 && e.UnitId == Desk && e.UnitPath == DeskPath && e.PreviousUnitId == null
                                          && e.Categories.SequenceEqual(new[] { "politics" })),
             "post:7", DeskPath, null);
@@ -140,7 +141,7 @@ public class PostFilingHandlers
         result.IsSuccess.ShouldBeTrue(string.Join(" ", result.Errors));
         result.Value.CategoryId.ShouldBe("economy");
         result.Value.Categories.ShouldBe(["economy", "politics"]);
-        _events.Received(1).Publish(ContentEvents.PostCategoriesChanged,
+        _events.Received(1).Publish(ContentEventTypes.PostCategoriesChanged,
             Arg.Is<PostCategoriesChanged>(e => e.PrimaryCategoryId == "economy" && e.PreviousCategories.SequenceEqual(new[] { "politics" })),
             "post:7", null, null);
     }

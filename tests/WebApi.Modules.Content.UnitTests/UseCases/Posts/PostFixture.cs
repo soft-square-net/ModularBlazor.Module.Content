@@ -5,7 +5,10 @@ using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.UseCases;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
+using soft.square.net.WebApi.Contracts.Messaging;
+using soft.square.net.WebApi.Modules.Content.UseCases.Events;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
+using soft.square.net.WebApi.Modules.Content.UseCases.Validation;
 
 namespace soft.square.net.WebApi.Modules.Content.UnitTests.UseCases.Posts;
 
@@ -25,6 +28,10 @@ public sealed class PostFixture
     public IOptions<ContentOptions> Options { get; } = Microsoft.Extensions.Options.Options.Create(new ContentOptions());
 
     public FakePostKindCatalog KindCatalog { get; } = new();
+    public FakeContentValidator Validator { get; } = new();
+    public IIntegrationEvents Events { get; } = Substitute.For<IIntegrationEvents>();
+    public ContentEventPublisher Publisher { get; }
+    public ContentValidation Validation { get; }
     public PostKindRules Kinds { get; }
 
     public PostAccess PostAccess { get; }
@@ -56,6 +63,10 @@ public sealed class PostFixture
         Editing = new PostContentEditing(Store, PostContents, Editors, ContentAccess);
         ContentDetails = new ContentDetails(ContentReader, ContentAccess, Pipelines);
         ContentChanges = new ContentChanges(Store, ContentAccess, ContentDetails);
+        Publisher = new ContentEventPublisher(Events);
+        Store.Publisher = Publisher;
+        Validation = new ContentValidation(Validator, Store, Publisher, PostAccess,
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
 
         ContentReader.ListAsync(Arg.Any<ISpecification<ContentItem>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<ISpecification<ContentItem>>().Evaluate(Store.Contents).ToList());

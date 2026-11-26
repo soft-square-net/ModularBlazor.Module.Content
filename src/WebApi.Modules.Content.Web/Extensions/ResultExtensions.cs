@@ -1,6 +1,7 @@
 using Ardalis.Result;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using soft.square.net.WebApi.Modules.Content.UseCases.Validation;
 
 namespace soft.square.net.WebApi.Modules.Content.Web.Extensions;
 
@@ -11,14 +12,24 @@ namespace soft.square.net.WebApi.Modules.Content.Web.Extensions;
 /// </summary>
 public static class ResultExtensions
 {
+    /// <summary>The extension member of a 422 that lists DynamicFields' problems.</summary>
+    public const string ProblemsKey = "problems";
+
     public static Results<Ok<T>, ProblemHttpResult> ToOkResult<T>(this Result<T> result) =>
         result.IsSuccess ? TypedResults.Ok(result.Value) : result.ToProblem();
 
     public static Results<Created<T>, ProblemHttpResult> ToCreatedResult<T>(this Result<T> result, Func<T, string> location) =>
         result.IsSuccess ? TypedResults.Created(location(result.Value), result.Value) : result.ToProblem();
 
+    /// <summary>
+    /// The problem response; DynamicFields' problems with a content (<see cref="ProblemErrors"/>) are 422 with a
+    /// <c>problems</c> list of <c>{ path, message, nodeId }</c>.
+    /// </summary>
     public static ProblemHttpResult ToProblem(this Ardalis.Result.IResult result) =>
-        TypedResults.Problem(detail: Detail(result), statusCode: result.Status switch
+        ProblemErrors.Of(result) is { Count: > 0 } problems
+            ? TypedResults.Problem(detail: Detail(result), statusCode: StatusCodes.Status422UnprocessableEntity,
+                title: "The content is not valid.", extensions: new Dictionary<string, object?> { [ProblemsKey] = problems })
+            : TypedResults.Problem(detail: Detail(result), statusCode: result.Status switch
         {
             ResultStatus.NotFound => StatusCodes.Status404NotFound,
             ResultStatus.Forbidden => StatusCodes.Status403Forbidden,

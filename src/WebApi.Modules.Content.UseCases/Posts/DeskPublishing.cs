@@ -11,6 +11,9 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 /// </summary>
 public sealed class DeskPublishing(PostContents contents, ContentPipelines pipelines, ContentAccess access)
 {
+    /// <summary>Whether the post is in a state Desk may publish or schedule from.</summary>
+    public static bool MayPublish(Post post) => post.State is PostState.Approved or PostState.AwaitingDeskReapproval or PostState.Scheduled;
+
     public async Task<PublishPlan> PlanAsync(Post post, CancellationToken ct)
     {
         var items = await contents.LoadAsync(post, ct);

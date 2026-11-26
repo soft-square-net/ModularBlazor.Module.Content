@@ -27,6 +27,7 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     public const int NodeIdLength = 64;
     public const int StageLength = PipelineDefinition.MaxKeyLength;
     public const int NoteLength = 1000;
+    public const int TitleLength = 120;
 
     private readonly List<ContentRevision> _revisions = [];
     private readonly List<ContentHistoryEntry> _history = [];
@@ -82,6 +83,12 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
         .. UnitId is { } unit ? new[] { $"section:{UnitPathRules.Id(unit)}" } : SectionId is { } section ? new[] { $"section:{section}" } : []
     ];
 
+    /// <summary>
+    /// A short title for lists ("My work"): the first text value of its node named title, heading, caption, alt or text
+    /// (or the first text value at all), at most <see cref="TitleLength"/> characters; else its field and node id.
+    /// </summary>
+    public string Title => ContentTitles.Of(Node, FieldKey, NodeId, TitleLength);
+
     /// <summary>The current values as a document node.</summary>
     public PostNode Node => ReadNode(ValuesJson);
 
@@ -109,6 +116,7 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
         content.SetValues(actor, values, now);
         content.Record(actor, "created", now, null);
         content.Emit(FeedEventTypes.ContentCreated, actor, now);
+        if (content.AssigneeId is not null) content.RaiseWorkItem(ContentWorkItemChange.Assigned, content.Stage, null);
         return content;
     }
 
@@ -179,11 +187,13 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
     {
         RequireActive("assign");
         // A content of a unit has no section any more (the unit replaced it): a legacy section id given with it is dropped.
+        var previous = AssigneeId;
         SectionId = UnitId is null ? Optional(sectionId) : null;
         AssigneeId = Optional(assigneeId);
         var detail = $"{SectionId}/{AssigneeId}";
         Change(actor, "assigned", now, detail);
         Emit(FeedEventTypes.ContentAssigned, actor, now, detail);
+        RaiseWorkItem(ContentWorkItemChange.Assigned, Stage, previous);
     }
 
     /// <summary>
@@ -269,7 +279,12 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
         var from = Stage;
         Change(actor, action, now, note is null ? $"{from} → {stage}" : $"{from} → {stage}: {note}", () => Stage = stage);
         Emit(FeedEventTypes.ContentStateChanged, actor, now, note is null ? action : $"{action}: {note}");
+        if (from != stage) RaiseWorkItem(ContentWorkItemChange.StateChanged, from, AssigneeId);
     }
+
+    /// <summary>The work item it is to other modules (its stage is the state): raised on a move and on an assignment.</summary>
+    private void RaiseWorkItem(ContentWorkItemChange change, string previousStage, string? previousAssignee) =>
+        Raise(new ContentWorkItemChanged(change, Id, Title, Stage, previousStage, AssigneeId, previousAssignee, UnitId, UnitPath));
 
     private void RequireActive(string what)
     {
@@ -288,7 +303,7 @@ public sealed class ContentItem : AggregateRoot<Guid>, ITenantOwned
         _history.Add(new ContentHistoryEntry(now, actor, action, Stage, detail is { Length: > NoteLength + 100 } d ? d[..(NoteLength + 100)] : detail));
 
     private void Emit(string type, string actor, DateTimeOffset now, string? detail = null) =>
-        Raise(new FeedEvent(type, null, Id, Version, Revision, Stage, null, actor, now, detail));
+        Raise(new FeedEvent(type, null, Id, Version, Revision, Stage, null, actor, now, detail, UnitPath));
 
     private void TakeEvents() => ((IHasDomainEvents)this).TakeDomainEvents();
 
