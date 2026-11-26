@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Content.Contracts: the public contract of the Content module, shipped as the NuGet package
+    soft.square.net.Content.Contracts.
+    - The content.* integration event types (ContentEventTypes) and their data records (v1).
+    - ContentWorkItems: the work-item types Content owns (content:content:{id}) and the states (the pipeline's stage keys).
+    - ContentLiveTopic: the live topic content:post:{id} and its message.
+    Plain data and the BCL only (no platform package), so any module, client or service can reference it. A module
+    copies it into its own output (a private dependency): no type of it is shared across load contexts.
+  -->
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>$(SoftSquarePrefix).Content.Contracts</PackageId>
+    <Description>Contracts of the ModularBlazor Content module: content.* integration events (v1), work-item types and the post live topic.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- The package's version; a release tag is v$(Version) (packages.yml checks that they agree). -->
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>preview.1</VersionSuffix>
+  </PropertyGroup>
+
+</Project>

@@ -63,4 +63,10 @@ public interface IContentStore
     Task<IReadOnlyList<FeedEntry>> FeedAsync(long after, DateTimeOffset notAfter, int take, int? postId, CancellationToken ct);
 
     Task SaveChangesAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Runs <paramref name="work"/> (which saves, maybe several times) in one transaction: all of it commits or none
+    /// (inside an open transaction it simply joins it). For a change whose event needs an id the first save gives.
+    /// </summary>
+    Task InTransactionAsync(Func<Task> work, CancellationToken ct);
 }

@@ -15,6 +15,7 @@ runtime module: see [docs/clean-architecture.md](docs/clean-architecture.md) for
 where a new feature goes.
 
 ```
+src/Content.Contracts/                       the package soft.square.net.Content.Contracts: content.* event records, ContentWorkItems, ContentLiveTopic
 src/WebApi.Modules.Content.Core/             Core: aggregates (PostAggregate, PressAggregate, CategoryAggregate), domain rules, specifications
 src/WebApi.Modules.Content.UseCases/         use cases: one folder each, a Mediator command or query and its handler, returning an Ardalis Result
 src/WebApi.Modules.Content.Infrastructure/   data: ContentDbContext, entity configurations, tenant migrations per database provider
@@ -217,15 +218,90 @@ field the tenant publishes. Its static URL prefix comes from that field.
   (with the unit's path in the envelope) remaps every content of that section to the unit and clears the section. The
   column stays until Shifts removes sections (S4).
 
-**Integration events** (Content turns on the platform's outbox and inbox, `UsesIntegrationEvents`):
+Content subscribes to `shifts.section-moved.v1` and `org.unit-*.v1` (the manifest's `Subscriptions`). The events it
+publishes are listed under "Work items, checks and events".
 
-| Event | When | Data |
-| --- | --- | --- |
-| `content.post-categories-changed.v1` | a post's categories changed | `postId, publicId, version, pressId, primaryCategoryId, categories, previousCategories, unitId, unitPath` |
-| `content.post-unit-changed.v1` | a post's unit changed | `postId, publicId, version, pressId, primaryCategoryId, categories, unitId, unitPath, previousUnitId` |
+## Work items, checks and events
 
-Both have the subject `post:{id}`, the source `content` and the post's unit path. They are sent once the save commits.
-Content subscribes to `shifts.section-moved.v1` and `org.unit-*.v1` (the manifest's `Subscriptions`).
+**A content is a work item; its stage is the state.** Each content of the library is the platform work item
+`content:content:{contentId}` (`ContentWorkItems` in `Content.Contracts`).
+
+- The built-in pipeline's stages are the agreed states: `assigned` → `in-progress` → `submitted` → `in-review` →
+  `accepted` | `returned`.
+
+  | Stage | Kind | Who edits | Actions from it |
+  | --- | --- | --- | --- |
+  | `assigned` (start) | Work | assignee | `start` → in-progress, `submit` → submitted; the first edit moves it to `in-progress` |
+  | `in-progress` | Work | assignee | `submit` |
+  | `submitted` | Review | `content.publish` | `review` → in-review, `accept` → accepted, `return` (note) → returned |
+  | `in-review` | Review | `content.publish` | `accept`, `return` |
+  | `accepted` | Accepted | `content.publish` (an edit sends it back to `in-review`) | `return`, `reopen` → in-review |
+  | `returned` | Work | assignee | `start`, `submit`; the first edit moves it to `in-progress` |
+
+- **Old keys.** The first pipeline's keys were `draft`, `desk`, `accepted`, `rejected` and the action `reject`.
+
+  | Old | New |
+  | --- | --- |
+  | `draft` | `assigned` |
+  | `desk` | `submitted` |
+  | `rejected` | `returned` |
+  | `accepted` | `accepted` (unchanged) |
+  | action `reject` | action `return` (`POST /contents/{id}/act` still takes `reject`) |
+
+  The migration `WorkItemStages` renames the stored stages and a published pipeline's keys on every engine. Elsa may
+  still publish the old keys: `PUT /pipeline` renames them the same way, unless the definition already has a stage with
+  the new key. History rows and old feed rows keep the keys they were written with.
+- **Events.** Every stage move publishes `content.work-item-state-changed.v1`, and every assignment
+  `content.work-item-assigned.v1` (the platform's `WorkItemStateChanged` / `WorkItemAssigned`), in the same save.
+  The snapshot is `ref content:content:{id}`, `title` (the content's first text value), `state` (the stage key),
+  `assignee` (`{kind:"user", id}` or null), `dueAt` (null) and `unitId` (N form). The subject is the reference, and the
+  envelope carries the content's unit path.
+
+**DynamicFields checks first.**
+
+- Any content action into a `Review` or `Accepted` stage first runs DynamicFields `validate-node` on the content and on
+  each nested node.
+- A post's approve, schedule and publish first run `validate` on the whole post (its working document). A legacy
+  title-and-body root has its contents checked one by one.
+- Problems: **422**, problem details with `problems: [{ path, message, nodeId }]`. Nothing changes, but the refusal is
+  recorded: the feed row `content.validation-failed` and the event `content.validation-failed.v1`.
+- DynamicFields can't be reached, or refuses the call: **503**, and the step waits (it never passes unchecked).
+- The calls go through the gateway (`Content:ApiBaseUrl`) with the caller's token and tenant, so the caller needs
+  `dynamicfields.read`. An unpublished field version (`validate-node` answers 404) is a problem at `/field`.
+
+**Integration events** (source `content`; records in `Content.Contracts`, `ContentEventTypes`). All are written to the
+outbox in the save that makes the change, and sent once it commits.
+
+| Event | When | Subject | Data |
+| --- | --- | --- | --- |
+| `content.post-created.v1` | a post is created (with the post's save, in one transaction) | `post:{id}` | `PostCreated`: `postId, publicId, version, postKind, title, ownerId, state, pressId, primaryCategoryId, categories, contents, unitId, unitPath, createdAt` |
+| `content.post-categories-changed.v1` | a post's categories changed | `post:{id}` | `postId, publicId, version, pressId, primaryCategoryId, categories, previousCategories, unitId, unitPath` |
+| `content.post-unit-changed.v1` | a post's unit changed | `post:{id}` | `postId, publicId, version, pressId, primaryCategoryId, categories, unitId, unitPath, previousUnitId` |
+| `content.validation-failed.v1` | DynamicFields refused a step | `post:{id}` or `content:{id}` | `ContentValidationFailed`: `check (node/post), action, contentId, postId, version, problems, by, at` |
+| `content.work-item-assigned.v1` | a content got an assignee | `content:content:{id}` | the platform's `WorkItemAssigned` |
+| `content.work-item-state-changed.v1` | a content moved to another stage | `content:content:{id}` | the platform's `WorkItemStateChanged` |
+| one per feed type, below | every feed row (`GET /events`) | `post:{id}`, else `content:{id}` | `ContentFeedEvent`: `feedType, postId, contentId, version, revision, stage, postState, by, at, detail` |
+
+The feed rows, mapped one to one (`ContentEventTypes.OfFeedType`):
+
+| Feed type | Event |
+| --- | --- |
+| `content.created` | `content.content-created.v1` |
+| `content.changed` | `content.content-changed.v1` |
+| `content.state-changed` | `content.content-state-changed.v1` |
+| `content.assigned` | `content.content-assigned.v1` |
+| `content.archived` | `content.content-archived.v1` |
+| `content.deleted` | `content.content-deleted.v1` |
+| `content.attached` | `content.content-attached.v1` |
+| `content.detached` | `content.content-detached.v1` |
+| `post.changed` | `content.post-changed.v1` |
+| `post.state-changed` | `content.post-state-changed.v1` |
+
+**The package `soft.square.net.Content.Contracts`** (`src/Content.Contracts`, BCL only, so any module can copy it
+privately) holds the event records and type names, `ContentWorkItems` (the type keys and the states) and
+`ContentLiveTopic` (`content:post:{id}` and its message). `.github/workflows/packages.yml` packs it on every push and
+pull request (`<VersionPrefix>-ci.<run>`), and publishes it to GitHub Packages only on a tag `v<Version>` that matches
+the version in its project.
 
 ## Migrations
 
@@ -237,6 +313,8 @@ Oracle Free 23. For each engine it:
 - checks the data step of `PostKindsAsFieldKeys` both ways;
 - checks `UnitsAndCategories`: posts keep their categories and unit, and down and up again a post's category becomes its
   `post_categories` row and the Arabic names start as the English ones; the integration outbox and inbox exist;
+- checks `WorkItemStages`: down, a content in `in-progress` goes back to `draft`; up, the old keys become the work-item
+  states, in the contents and in a pipeline published with the old keys (its definition is read back through EF);
 - runs every Down and every Up again;
 - checks that the model snapshot matches the model (`HasPendingModelChanges`; this check needs no Docker).
 

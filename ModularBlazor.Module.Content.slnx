@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Content.Contracts/Content.Contracts.csproj" />
     <Project Path="src/WebApi.Modules.Content.Core/WebApi.Modules.Content.Core.csproj" />
     <Project Path="src/WebApi.Modules.Content.UseCases/WebApi.Modules.Content.UseCases.csproj" />
     <Project Path="src/WebApi.Modules.Content.Infrastructure/WebApi.Modules.Content.Infrastructure.csproj" />

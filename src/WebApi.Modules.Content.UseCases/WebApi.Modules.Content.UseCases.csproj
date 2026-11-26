@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebApi.Modules.Content.Core\WebApi.Modules.Content.Core.csproj" />
+    <!-- Private: the content.* event records, the work-item types and the live topic (also the package soft.square.net.Content.Contracts). -->
+    <ProjectReference Include="..\Content.Contracts\Content.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

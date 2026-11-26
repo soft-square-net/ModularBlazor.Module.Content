@@ -23,14 +23,21 @@ public static class FeedEventTypes
     public const string PostChanged = "post.changed";
     /// <summary>A post moved to another workflow state (<see cref="FeedEvent.PostState"/>).</summary>
     public const string PostStateChanged = "post.state-changed";
+    /// <summary>
+    /// DynamicFields refused a content (<see cref="FeedEvent.ContentId"/>) or a post (<see cref="FeedEvent.PostId"/>) on its way
+    /// to review, acceptance or publication; <see cref="FeedEvent.Detail"/> is the action and the first problems. Nothing else
+    /// changed (the action was refused with 422).
+    /// </summary>
+    public const string ValidationFailed = "content.validation-failed";
 }
 
 /// <summary>
 /// Raised by <c>Post</c> and <c>ContentItem</c>; a handler writes it to the outbox (<see cref="FeedEntry"/>) in the save that
 /// raised it, so the feed never misses a change and never shows one that was rolled back.
 /// </summary>
+/// <param name="UnitPath">The unit path of the post or content that raised it (the integration envelope's); not stored in the feed.</param>
 public sealed record FeedEvent(string Type, int? PostId, Guid? ContentId, int Version, int? Revision, string? Stage, string? PostState,
-    string By, DateTimeOffset At, string? Detail = null) : IDomainEvent;
+    string By, DateTimeOffset At, string? Detail = null, string? UnitPath = null) : IDomainEvent;
 
 /// <summary>
 /// One row of the module's outbox: the feed <c>GET /events?after=</c> that workflows (Elsa) read in order, and the per-post

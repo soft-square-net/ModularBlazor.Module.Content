@@ -39,7 +39,7 @@ public sealed class PostFilingStore : IDisposable
         context.AddRange(filed, plain);
         var content = ContentItem.Create("owner-1", "daily", "politics", null,
             new PostNode("", PostKinds.Article, "block.paragraph", 1, System.Text.Json.JsonDocument.Parse("""{"text":"x"}""").RootElement, System.Text.Json.JsonDocument.Parse("{}").RootElement, []),
-            "draft", Now, sectionId: "3");
+            "assigned", Now, sectionId: "3");
         context.Add(content);
         await context.SaveChangesAsync(Ct);
         return (filed, plain);

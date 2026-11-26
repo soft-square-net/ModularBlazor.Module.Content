@@ -75,7 +75,10 @@ public sealed class Act : IEndpoint
         app.MapPost("/contents/{id:guid}/act", async (Guid id, ContentAction r, ISender sender, CancellationToken ct) =>
             (await sender.Send(new ActOnContentCommand(id, r.Action, r.Version, r.Note), ct)).ToOkResult())
             .WithName("Content_ActOnContent")
-            .WithSummary("Act(contentId, action, expectedVersion, note?): move a content through the pipeline.");
+            .WithSummary("Act(contentId, action, expectedVersion, note?): move a content through the pipeline.")
+            .WithDescription("An action into a review or accepted stage first has DynamicFields check the content: 422 with `problems` " +
+                             "({path, message, nodeId}) when it is not valid, 503 while DynamicFields cannot answer.")
+            .ProducesValidationFailure();
 }
 
 /// <summary>POST /contents/{id}/assign: give it to a section and/or a person (shift Manager).</summary>

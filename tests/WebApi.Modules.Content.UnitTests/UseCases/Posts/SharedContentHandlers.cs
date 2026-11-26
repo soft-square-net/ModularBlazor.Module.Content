@@ -34,7 +34,7 @@ public class SharedContentHandlers
             _fixture.Stored(saved);
             return saved;
         });
-        var handler = new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds);
+        var handler = new CreatePostHandler(categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds, _fixture.Publisher);
 
         var result = await handler.Handle(new CreatePostCommand("politics", "A title", "", PostKinds.News, Document(children)), Ct);
 
@@ -61,7 +61,7 @@ public class SharedContentHandlers
         MoveToReview(post);
         _fixture.SignIn(PostBuilder.Reviewer);
         _fixture.Allow(ContentPermissions.Review);
-        var approved = await new ApprovePostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.PostContents, _fixture.Pipelines)
+        var approved = await new ApprovePostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.PostContents, _fixture.Pipelines, _fixture.Validation)
             .Handle(new ApprovePostCommand(post.Id, post.Version), Ct);
         approved.IsSuccess.ShouldBeTrue();
         return post;
@@ -71,7 +71,7 @@ public class SharedContentHandlers
     {
         _fixture.SignIn(PostBuilder.Desk);
         _fixture.Allow(ContentPermissions.Publish);
-        return new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds).Handle(new PublishPostCommand(post.Id, post.Version), Ct).AsTask();
+        return new PublishPostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.Desk, _fixture.Kinds, _fixture.Validation).Handle(new PublishPostCommand(post.Id, post.Version), Ct).AsTask();
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class SharedContentHandlers
         var post = await CreateAsync(Paragraph("p1", "One"), Paragraph("p2", "Two"));
 
         _fixture.Store.Contents.Select(c => c.NodeId).ShouldBe(["p1", "p2"]);
-        _fixture.Store.Contents.ShouldAllBe(c => c.OriginPostId == post.PublicId && c.Stage == "draft");
+        _fixture.Store.Contents.ShouldAllBe(c => c.OriginPostId == post.PublicId && c.Stage == "assigned");
         post.Contents.Select(c => c.ContentId).ShouldBe(_fixture.Store.Contents.Select(c => c.Id));
         JsonSerializer.Deserialize<PostDocument>(post.DocumentJson, Web)!.Children.Select(c => c.NodeId).ShouldBe(["p1", "p2"]);
     }
@@ -93,7 +93,7 @@ public class SharedContentHandlers
         var detail = await _fixture.Details.GetAsync(1, Ct);
 
         detail.Value.Contents.ShouldHaveSingleItem().NodeId.ShouldBe("p1");
-        detail.Value.Contents[0].Stage.ShouldBe("draft");
+        detail.Value.Contents[0].Stage.ShouldBe("assigned");
         detail.Value.Document.Children.ShouldHaveSingleItem().NodeId.ShouldBe("p1");
     }
 
@@ -131,7 +131,7 @@ public class SharedContentHandlers
     {
         await ApprovedAsync();
 
-        _fixture.Store.Contents.ShouldAllBe(c => c.Stage == "desk");
+        _fixture.Store.Contents.ShouldAllBe(c => c.Stage == "submitted");
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public class SharedContentHandlers
     public async Task ARejectedRequiredContentBlocksThePublication()
     {
         var post = await ApprovedAsync();
-        Content("p2").Act(PostBuilder.Desk, PipelineDefinition.Default.Action("reject"), "Needs a source", TestClock.Start);
+        Content("p2").Act(PostBuilder.Desk, PipelineDefinition.Default.Action("return"), "Needs a source", TestClock.Start);
 
         await Should.ThrowAsync<DomainException>(() => PublishAsync(post));
         post.State.ShouldBe(PostState.Approved);
@@ -163,7 +163,7 @@ public class SharedContentHandlers
     {
         await CreateAsync(Paragraph("p1", "One"));
         var content = Content("p1");
-        var act = new ActOnContentHandler(_fixture.ContentChanges, _fixture.ContentAccess, _fixture.Pipelines);
+        var act = new ActOnContentHandler(_fixture.ContentChanges, _fixture.ContentAccess, _fixture.Pipelines, _fixture.Validation);
 
         _fixture.SignIn("someone-else");
         _fixture.Allow(ContentPermissions.Editor); // sees it, but is not its assignee
@@ -172,7 +172,7 @@ public class SharedContentHandlers
         _fixture.SignIn(PostBuilder.Owner);
         var submitted = await act.Handle(new ActOnContentCommand(content.Id, "submit", 0, null), Ct);
         submitted.IsSuccess.ShouldBeTrue();
-        submitted.Value.Stage.ShouldBe("desk");
+        submitted.Value.Stage.ShouldBe("submitted");
 
         (await act.Handle(new ActOnContentCommand(content.Id, "accept", 0, null), Ct)).Status.ShouldBe(ResultStatus.Conflict); // stale version
         (await act.Handle(new ActOnContentCommand(content.Id, "launch", 1, null), Ct)).Status.ShouldBe(ResultStatus.Invalid);
@@ -185,7 +185,7 @@ public class SharedContentHandlers
 
         var detail = await _fixture.ContentDetails.GetAsync(Content("p1").Id, Ct);
 
-        detail.Value.Actions.ShouldBe(["submit"]);
+        detail.Value.Actions.ShouldBe(["start", "submit"]);
         detail.Value.CanEdit.ShouldBeTrue();
     }
 

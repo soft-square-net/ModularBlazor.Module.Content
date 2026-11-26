@@ -49,7 +49,7 @@ public sealed class LiveNudges : IDisposable
         if (shared is { } id) content = await context.Contents.SingleAsync(c => c.Id == id, Ct);
         else
         {
-            content = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p1", "One"), "draft", Now);
+            content = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p1", "One"), "assigned", Now);
             context.Contents.Add(content);
         }
         var root = new PostDocument("post.news", 1, Json("""{ "headline": "Final day" }"""), Json("{}"), []);
@@ -97,7 +97,7 @@ public sealed class LiveNudges : IDisposable
         {
             var store = new ContentStore(context);
             var item = (await store.ContentsAsync([content], Ct)).Single();
-            item.Edit("owner-1", Paragraph("p1", "One, edited"), PipelineDefinition.Default.Stage("draft"), Now);
+            item.Edit("owner-1", Paragraph("p1", "One, edited"), PipelineDefinition.Default.Stage("assigned"), Now);
             await store.SaveChangesAsync(Ct);
         }
 

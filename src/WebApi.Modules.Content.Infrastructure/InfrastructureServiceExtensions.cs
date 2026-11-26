@@ -8,6 +8,7 @@ using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Http;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
 using soft.square.net.WebApi.Modules.Content.UseCases.Units;
+using soft.square.net.WebApi.Modules.Content.UseCases.Validation;
 
 namespace soft.square.net.WebApi.Modules.Content.Infrastructure;
 
@@ -36,6 +37,8 @@ public static class InfrastructureServiceExtensions
         services.AddHttpContextAccessor();
         services.AddSingleton<IMemoryCache>(_ => new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 }));
         services.AddHttpClient<IPostKindCatalog, DynamicFieldsPostKinds>(client => client.Timeout = TimeSpan.FromSeconds(10));
+        // DynamicFields' content checks (validate-node, validate) before review, acceptance and publication.
+        services.AddHttpClient<IContentValidator, DynamicFieldsContentValidator>(client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddHttpClient(OrganizationUnitLookup.ClientName, client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IUnitLookup, OrganizationUnitLookup>();
         return services;

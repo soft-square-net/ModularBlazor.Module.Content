@@ -27,7 +27,9 @@ public sealed class GetPipelineHandler(IContentStore store, PostAccess access) :
 
 /// <summary>
 /// Publish a new pipeline (Elsa, or an admin: <c>content.pipeline</c> tenant-wide). It applies to the next action; contents
-/// keep their stage keys.
+/// keep their stage keys. The stage keys of the first built-in pipeline are renamed to today's
+/// (<see cref="PipelineDefinition.WithCurrentStageKeys"/>: draft → assigned, desk → submitted, rejected → returned), as the
+/// migration renamed the stored stages.
 /// </summary>
 public sealed record PublishPipelineCommand(PipelineDefinition Definition) : ICommand<Result<PipelineInfo>>;
 
@@ -38,9 +40,10 @@ public sealed class PublishPipelineHandler(IContentStore store, PostAccess acces
         var allowed = await access.RequireTenantWideAsync(ContentPermissions.Pipeline, "Publishing the pipeline needs content.pipeline for the whole tenant.", ct);
         if (!allowed.IsSuccess) return allowed.As<PipelineInfo>();
         if (command.Definition is null) return Result<PipelineInfo>.Invalid(new ValidationError("A pipeline definition is required."));
+        var definition = command.Definition.WithCurrentStageKeys();
         var pipeline = await store.PipelineAsync(ct);
-        if (pipeline is null) store.Add(Pipeline.Create(command.Definition, access.Me, access.Now));
-        else pipeline.Publish(command.Definition, access.Me, access.Now);
+        if (pipeline is null) store.Add(Pipeline.Create(definition, access.Me, access.Now));
+        else pipeline.Publish(definition, access.Me, access.Now);
         await store.SaveChangesAsync(ct);
         var saved = (await store.PipelineAsync(ct))!;
         return new PipelineInfo(saved.Version, saved.UpdatedAt, saved.UpdatedBy, saved.Definition);

@@ -136,8 +136,8 @@ public class PostWithContents
     [Fact]
     public void TwoContentsOfAPostCannotShareANodeId()
     {
-        var a = ContentItem.Create(PostBuilder.Owner, "daily", "politics", null, Paragraph("p1", "A"), "draft", Now);
-        var b = ContentItem.Create(PostBuilder.Owner, "daily", "politics", null, Paragraph("p1", "B"), "draft", Now);
+        var a = ContentItem.Create(PostBuilder.Owner, "daily", "politics", null, Paragraph("p1", "A"), "assigned", Now);
+        var b = ContentItem.Create(PostBuilder.Owner, "daily", "politics", null, Paragraph("p1", "B"), "assigned", Now);
 
         Should.Throw<DomainException>(() => PostComposition.RequireUniqueNodes([a, b]));
     }
@@ -172,7 +172,7 @@ public class PostSplitMigration
         var contents = PostSplit.Migrate(post, Read(post), Pipeline, Now);
 
         contents.Select(c => c.NodeId).ShouldBe(["p1", "p2"]);
-        contents.ShouldAllBe(c => c.Stage == "draft" && c.AcceptedRevision == null && c.OriginPostId == post.StablePublicId);
+        contents.ShouldAllBe(c => c.Stage == "assigned" && c.AcceptedRevision == null && c.OriginPostId == post.StablePublicId);
         contents.ShouldAllBe(c => c.CreatedBy == PostBuilder.Owner && c.Revision == 1);
         post.ContentsSplit.ShouldBeTrue();
         post.Contents.Select(c => c.ContentId).ShouldBe(contents.Select(c => c.Id));
@@ -200,7 +200,7 @@ public class PostSplitMigration
 
         var contents = PostSplit.Migrate(post, Read(post), Pipeline, Now);
 
-        contents.ShouldAllBe(c => c.Stage == "desk" && c.AcceptedRevision == null);
+        contents.ShouldAllBe(c => c.Stage == "submitted" && c.AcceptedRevision == null);
     }
 
     [Fact]

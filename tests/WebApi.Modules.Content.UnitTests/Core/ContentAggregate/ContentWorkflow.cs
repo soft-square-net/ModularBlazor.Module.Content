@@ -20,7 +20,7 @@ public class ContentWorkflow
 
         content.Revision.ShouldBe(1);
         content.Version.ShouldBe(0);
-        content.Stage.ShouldBe("draft");
+        content.Stage.ShouldBe("assigned");
         content.FieldKey.ShouldBe("block.paragraph");
         content.NodeId.ShouldStartWith("c-");
         content.Revisions.ShouldHaveSingleItem().Revision.ShouldBe(1);
@@ -37,10 +37,11 @@ public class ContentWorkflow
         content.Edit(PostBuilder.Owner, Paragraph("other", "Two"), Stage(content), Now).ShouldBeTrue();
 
         content.Revision.ShouldBe(2);
-        content.Version.ShouldBe(1);
+        content.Version.ShouldBe(2); // the edit, then the move to in-progress
         content.NodeId.ShouldBe(nodeId);
         content.Node.Content.GetProperty("text").GetString().ShouldBe("Two");
-        Events(content).Single().Type.ShouldBe(FeedEventTypes.ContentChanged);
+        content.Stage.ShouldBe("in-progress"); // the first edit starts the work
+        Events(content).Select(e => e.Type).ShouldBe([FeedEventTypes.ContentChanged, FeedEventTypes.ContentStateChanged]);
     }
 
     [Fact]
@@ -69,15 +70,15 @@ public class ContentWorkflow
     }
 
     [Fact]
-    public void RejectNeedsANoteAndKeepsIt()
+    public void ReturnNeedsANoteAndKeepsIt()
     {
         var content = Item();
         content.Act(PostBuilder.Owner, Action("submit"), null, Now);
 
-        Should.Throw<DomainException>(() => content.Act(PostBuilder.Desk, Action("reject"), " ", Now));
-        content.Act(PostBuilder.Desk, Action("reject"), "Check the quote", Now);
+        Should.Throw<DomainException>(() => content.Act(PostBuilder.Desk, Action("return"), " ", Now));
+        content.Act(PostBuilder.Desk, Action("return"), "Check the quote", Now);
 
-        content.Stage.ShouldBe("rejected");
+        content.Stage.ShouldBe("returned");
         content.ReviewNote.ShouldBe("Check the quote");
     }
 
@@ -94,7 +95,7 @@ public class ContentWorkflow
 
         content.Edit(PostBuilder.Desk, Paragraph("", "Edited by Desk"), Stage(content), Now);
 
-        content.Stage.ShouldBe("desk");
+        content.Stage.ShouldBe("in-review");
         content.Revision.ShouldBe(2);
         content.AcceptedRevision.ShouldBe(1);
     }
@@ -134,34 +135,34 @@ public class PipelineValidation
     {
         var pipeline = PipelineDefinition.Default;
 
-        pipeline.SubmitFrom("draft")!.Key.ShouldBe("submit");
-        pipeline.SubmitFrom("rejected")!.Key.ShouldBe("submit");
-        pipeline.AcceptFrom("desk")!.Key.ShouldBe("accept");
-        pipeline.AcceptFrom("draft").ShouldBeNull();
+        pipeline.SubmitFrom("assigned")!.Key.ShouldBe("submit");
+        pipeline.SubmitFrom("returned")!.Key.ShouldBe("submit");
+        pipeline.AcceptFrom("submitted")!.Key.ShouldBe("accept");
+        pipeline.AcceptFrom("assigned").ShouldBeNull();
     }
 
     [Fact]
     public void RefusesAnActionToAnUnknownStage() =>
         Should.Throw<DomainException>(() => (PipelineDefinition.Default with
         {
-            Actions = [.. PipelineDefinition.Default.Actions, new PipelineAction("send", ["draft"], "nowhere", ["assignee"])]
+            Actions = [.. PipelineDefinition.Default.Actions, new PipelineAction("send", ["assigned"], "nowhere", ["assignee"])]
         }).Validate());
 
     [Fact]
     public void RefusesAPinThatDoesNotLeadToAnAcceptedStage() =>
         Should.Throw<DomainException>(() => (PipelineDefinition.Default with
         {
-            Actions = [new PipelineAction("accept", ["desk"], "draft", ["content.publish"], Pins: true)]
+            Actions = [new PipelineAction("accept", ["submitted"], "assigned", ["content.publish"], Pins: true)]
         }).Validate());
 
     [Fact]
     public void RefusesAStartThatIsNotAWorkStage() =>
-        Should.Throw<DomainException>(() => (PipelineDefinition.Default with { StartStage = "desk" }).Validate());
+        Should.Throw<DomainException>(() => (PipelineDefinition.Default with { StartStage = "submitted" }).Validate());
 
     [Fact]
     public void RefusesAnActionNobodyMayTake() =>
         Should.Throw<DomainException>(() => (PipelineDefinition.Default with
         {
-            Actions = [new PipelineAction("submit", ["draft"], "desk", [])]
+            Actions = [new PipelineAction("submit", ["assigned"], "submitted", [])]
         }).Validate());
 }

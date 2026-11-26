@@ -12,9 +12,10 @@ namespace soft.square.net.WebApi.Modules.Content.Web;
 /// Contents module: presses, categories and Posts with the newsroom workflow of the auth design. Tenant data (schema
 /// "content" in each tenant's database). Rights come from grants: standing ones (author, editor) from admins, shift
 /// ones (accept, assign, transfer, return, review, publish) from the shifts module's rota, so they hold only while the
-/// shift runs. Posts are filed in categories of their press and, by the workflow, in an Organization unit; the module
-/// publishes <c>content.post-categories-changed.v1</c> and <c>content.post-unit-changed.v1</c> and follows
-/// <c>shifts.section-moved.v1</c> and <c>org.unit-*.v1</c>.
+/// shift runs. Posts are filed in categories of their press and, by the workflow, in an Organization unit. Each content is
+/// a work item (<c>content:content:{id}</c>, state = its stage). The module publishes the <c>content.*</c> events of
+/// <c>Content.Contracts</c> (<c>ContentEventTypes</c>: every feed row, post-created, the post's categories and unit, the
+/// work items, validation failures) and follows <c>shifts.section-moved.v1</c> and <c>org.unit-*.v1</c>.
 /// This is the composition root (the template's Program.cs): the runtime creates it, reads the manifest and calls
 /// <see cref="ConfigureServices"/> on the module's own container; the endpoints are in <see cref="ContentRoutes"/>.
 /// </summary>

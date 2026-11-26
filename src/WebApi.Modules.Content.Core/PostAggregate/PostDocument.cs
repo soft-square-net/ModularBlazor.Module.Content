@@ -30,11 +30,14 @@ public sealed record PostDocument(
     JsonElement Style,
     IReadOnlyList<PostNode> Children)
 {
+    /// <summary>The schema of a document made from a legacy title and body (not a DynamicFields field).</summary>
+    public const string LegacySchemaId = "legacy.basic";
+
     public static PostDocument FromLegacy(string title, string body)
     {
         using var content = JsonDocument.Parse(JsonSerializer.Serialize(new { title, body }));
         using var style = JsonDocument.Parse("{}");
-        return new PostDocument("legacy.basic", 1, content.RootElement.Clone(), style.RootElement.Clone(), []);
+        return new PostDocument(LegacySchemaId, 1, content.RootElement.Clone(), style.RootElement.Clone(), []);
     }
 }
 

@@ -45,8 +45,8 @@ public sealed class SharedContentsStore : IDisposable
     {
         await using var context = _database.For("acme");
         var publicId = Post.NewPublicId();
-        var a = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p1", "One"), "draft", Now);
-        var b = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p2", "Two"), "draft", Now);
+        var a = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p1", "One"), "assigned", Now);
+        var b = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p2", "Two"), "assigned", Now);
         var items = new Dictionary<Guid, ContentItem> { [a.Id] = a, [b.Id] = b };
         var root = Document();
         var post = Post.Create("owner-1", category, title, "", Now, PostKinds.News, PostComposition.Working(root, [a.Id, b.Id], items),
@@ -86,7 +86,7 @@ public sealed class SharedContentsStore : IDisposable
         {
             var store = new ContentStore(context);
             var content = (await store.ContentsAsync([first], Ct)).Single();
-            content.Edit("owner-1", Paragraph("p1", "One, edited"), PipelineDefinition.Default.Stage("draft"), Now);
+            content.Edit("owner-1", Paragraph("p1", "One, edited"), PipelineDefinition.Default.Stage("assigned"), Now);
             await store.SaveChangesAsync(Ct);
         }
 
@@ -95,11 +95,14 @@ public sealed class SharedContentsStore : IDisposable
         JsonSerializer.Deserialize<PostDocument>(post.DocumentJson, Web)!.Children[0].Content.GetProperty("text").GetString().ShouldBe("One, edited");
 
         var feed = await new ContentStore(reader).FeedAsync(0, Now.AddDays(1), 100, postId, Ct);
-        feed.Select(e => e.Type).ShouldBe([FeedEventTypes.ContentCreated, FeedEventTypes.ContentCreated, FeedEventTypes.ContentChanged]);
-        feed.Last().Revision.ShouldBe(2);
+        // The first edit also starts the work: assigned → in-progress.
+        feed.Select(e => e.Type).ShouldBe([FeedEventTypes.ContentCreated, FeedEventTypes.ContentCreated, FeedEventTypes.ContentChanged,
+            FeedEventTypes.ContentStateChanged]);
+        feed[2].Revision.ShouldBe(2);
+        feed[3].Stage.ShouldBe("in-progress");
         var other = await new ContentStore(reader).FeedAsync(0, Now.AddDays(1), 100, otherId, Ct);
         other.ShouldNotContain(e => e.ContentId == first);
-        (await new ContentStore(reader).FeedAsync(feed[0].Id, Now.AddDays(1), 100, null, Ct)).Count.ShouldBe(4); // all but the first
+        (await new ContentStore(reader).FeedAsync(feed[0].Id, Now.AddDays(1), 100, null, Ct)).Count.ShouldBe(5); // all but the first
     }
 
     [Fact]

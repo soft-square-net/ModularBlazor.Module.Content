@@ -22,21 +22,29 @@ Stages and actions are data (`GET /pipeline`, `PUT /pipeline` with `content.pipe
 `POST /contents/{id}/act { action, version, note? }`: Content checks the stage it starts from, who may take it (`assignee`,
 `creator`, or a permission on the content's press/category) and the note it needs, without calling Elsa.
 
-The default:
+The default (wave 4 C3: the stage keys are the work-item states, see the README's "Work items, checks and events"):
 
 | Stage | Kind | Edited by |
 |---|---|---|
-| `draft` | work | the assignee (the creator while none) |
-| `desk` | review | Desk (`content.publish`): "edit as Desk" |
-| `accepted` | accepted | Desk; an edit sends it back to `desk`, the accepted revision stays pinned |
-| `rejected` | work | the assignee |
+| `assigned` | work | the assignee (the creator while none); the first edit moves it to `in-progress` |
+| `in-progress` | work | the assignee |
+| `submitted` | review | Desk (`content.publish`): "edit as Desk" |
+| `in-review` | review | Desk |
+| `accepted` | accepted | Desk; an edit sends it back to `in-review`, the accepted revision stays pinned |
+| `returned` | work | the assignee; the first edit moves it to `in-progress` |
 
 | Action | From → to | Who |
 |---|---|---|
-| `submit` | draft, rejected → desk | assignee |
-| `accept` | desk → accepted (pins the revision) | `content.publish` |
-| `reject` | desk, accepted → rejected (note required) | `content.publish`, `content.return` |
-| `reopen` | accepted → desk | `content.publish` |
+| `start` | assigned, returned → in-progress | assignee |
+| `submit` | assigned, in-progress, returned → submitted | assignee |
+| `review` | submitted → in-review | `content.publish` |
+| `accept` | submitted, in-review → accepted (pins the revision) | `content.publish` |
+| `return` | submitted, in-review, accepted → returned (note required) | `content.publish`, `content.return` |
+| `reopen` | accepted → in-review | `content.publish` |
+
+Before C3 the stages were `draft`, `desk`, `accepted` and `rejected`, and `return` was `reject`. The migration
+`WorkItemStages` renamed them (draft → assigned, desk → submitted, rejected → returned); `PUT /pipeline` still accepts
+the old keys and renames them, and `act` still takes `reject`.
 
 ## Invariants
 
@@ -70,7 +78,7 @@ post: its own events and those of the contents it uses, for the studio's hot rel
 `SharedContents` (all four engines) adds the tables and `articles.ContentsSplit` (false for existing rows). The data step
 is `ContentBackfill`, a tenant initializer that runs after the schema migrations, behind the tenant database's advisory
 lock: each unsplit post's top-level children become contents (revision 1, same node id). Scheduled and published posts'
-contents are accepted and pinned; approved and awaiting-re-approval ones wait at the Desk; the rest start in `draft`.
+contents are accepted and pinned; approved and awaiting-re-approval ones wait at the Desk; the rest start in the start stage (`assigned`).
 Published snapshots are untouched. It writes no feed events.
 
 ## Not yet
