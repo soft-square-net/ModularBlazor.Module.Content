@@ -50,7 +50,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CategoryDto> AddCategoryAsync(CategoryDto body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<CategoryDto> AddCategoryAsync(NewCategory body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -66,7 +66,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<ContentSummary>> ListContentsAsync(string? sectionId = null, string? stage = null, string? assigneeId = null, string? fieldKey = null, bool? archived = null, int? skip = null, int? take = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+        System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<ContentSummary>> ListContentsAsync(string? sectionId = null, string? stage = null, string? assigneeId = null, string? fieldKey = null, bool? archived = null, int? skip = null, int? take = null, System.Guid? unitId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>Created</returns>
@@ -105,6 +105,14 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<ContentDetail> AssignContentAsync(System.Guid id, ContentAssignment body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Give the content to an Organization unit that serves its category (the workflow only).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ContentDetail> SetContentUnitAsync(System.Guid id, UnitAssignment body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>OK</returns>
@@ -226,6 +234,22 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<PostDetail> SetPostSlugsAsync(int id, PostSlugsEdit body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Set the post's categories (a primary one and others, all of its press).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<PostDetail> SetPostCategoriesAsync(int id, PostCategories body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Put the post in an Organization unit that serves one of its categories (the workflow only).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<PostDetail> SetPostUnitAsync(int id, UnitAssignment body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>OK</returns>
@@ -519,7 +543,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<CategoryDto> AddCategoryAsync(CategoryDto body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<CategoryDto> AddCategoryAsync(NewCategory body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             if (body == null)
                 throw new System.ArgumentNullException("body");
@@ -684,7 +708,7 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         /// </summary>
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<ContentSummary>> ListContentsAsync(string? sectionId = null, string? stage = null, string? assigneeId = null, string? fieldKey = null, bool? archived = null, int? skip = null, int? take = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<ContentSummary>> ListContentsAsync(string? sectionId = null, string? stage = null, string? assigneeId = null, string? fieldKey = null, bool? archived = null, int? skip = null, int? take = null, System.Guid? unitId = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
         {
             var client_ = _httpClient;
             var disposeClient_ = false;
@@ -727,6 +751,10 @@ namespace soft.square.net.WebApi.Modules.Content.Client
                     if (take != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("take")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(take, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (unitId != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("unitId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(unitId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -1288,6 +1316,92 @@ namespace soft.square.net.WebApi.Modules.Content.Client
                     urlBuilder_.Append("api/content/contents/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/assign");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ContentDetail>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ContentApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ContentApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Give the content to an Organization unit that serves its category (the workflow only).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ContentDetail> SetContentUnitAsync(System.Guid id, UnitAssignment body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/content/contents/{id}/unit"
+                    urlBuilder_.Append("api/content/contents/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/unit");
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -3217,6 +3331,178 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Set the post's categories (a primary one and others, all of its press).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<PostDetail> SetPostCategoriesAsync(int id, PostCategories body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/content/posts/{id}/categories"
+                    urlBuilder_.Append("api/content/posts/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/categories");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<PostDetail>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ContentApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ContentApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Put the post in an Organization unit that serves one of its categories (the workflow only).
+        /// </summary>
+        /// <returns>OK</returns>
+        /// <exception cref="ContentApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<PostDetail> SetPostUnitAsync(int id, UnitAssignment body, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
+        {
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.ByteArrayContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/content/posts/{id}/unit"
+                    urlBuilder_.Append("api/content/posts/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/unit");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<PostDetail>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ContentApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ContentApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <returns>OK</returns>
         /// <exception cref="ContentApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<FeedPage> GetPostEventsAsync(int id, long? after = null, int? take = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken))
@@ -3728,6 +4014,14 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string Name { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("nameEn")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string NameEn { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("nameAr")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string NameAr { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -3877,6 +4171,12 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("canEdit")]
         public bool CanEdit { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitPath")]
+        public string? UnitPath { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4102,6 +4402,9 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.Text.Json.Serialization.JsonPropertyName("archived")]
         public bool Archived { get; set; } = default!;
 
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
+
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
         [System.Text.Json.Serialization.JsonExtensionData]
@@ -4208,6 +4511,38 @@ namespace soft.square.net.WebApi.Modules.Content.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class NewCategory
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string Id { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("pressId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PressId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("nameEn")]
+        public string? NameEn { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("nameAr")]
+        public string? NameAr { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string? Name { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class NewContent
     {
 
@@ -4267,6 +4602,9 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("document")]
         public PostDocument? Document { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("categoryIds")]
+        public System.Collections.Generic.IReadOnlyList<string>? CategoryIds { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4407,6 +4745,31 @@ namespace soft.square.net.WebApi.Modules.Content.Client
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class PostCategories
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("version")]
+        public int Version { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("primaryCategoryId")]
+        [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
+        public string PrimaryCategoryId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("categoryIds")]
+        public System.Collections.Generic.IReadOnlyList<string>? CategoryIds { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class PostContentAttachment
     {
 
@@ -4489,6 +4852,9 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("drift")]
         public bool Drift { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4655,6 +5021,16 @@ namespace soft.square.net.WebApi.Modules.Content.Client
 
         [System.Text.Json.Serialization.JsonPropertyName("canonicalPath")]
         public string? CanonicalPath { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("categories")]
+        [System.ComponentModel.DataAnnotations.Required]
+        public System.Collections.Generic.IReadOnlyList<string> Categories { get; set; } = new System.Collections.Generic.List<string>();
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitPath")]
+        public string? UnitPath { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -4917,6 +5293,9 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.Text.Json.Serialization.JsonPropertyName("updatedAt")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public System.DateTimeOffset UpdatedAt { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 
@@ -5184,6 +5563,27 @@ namespace soft.square.net.WebApi.Modules.Content.Client
         [System.Text.Json.Serialization.JsonPropertyName("sourceHash")]
         [System.ComponentModel.DataAnnotations.Required(AllowEmptyStrings = true)]
         public string SourceHash { get; set; } = default!;
+
+        private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
+
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.8.0.0 (NJsonSchema v11.6.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class UnitAssignment
+    {
+
+        [System.Text.Json.Serialization.JsonPropertyName("version")]
+        public int Version { get; set; } = default!;
+
+        [System.Text.Json.Serialization.JsonPropertyName("unitId")]
+        public System.Guid? UnitId { get; set; } = default!;
 
         private System.Collections.Generic.IDictionary<string, object>? _additionalProperties;
 

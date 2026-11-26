@@ -11,7 +11,7 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Live;
 /// <summary>
 /// The module's live topic: <c>content:post:{id}</c>. A subscriber gets a small nudge whenever the post's feed
 /// (<c>GET /posts/{id}/events</c>) has a new row, then re-reads the feed. Declared in the manifest as
-/// <see cref="Topic"/>; the hub checks <see cref="Permission"/> on <c>post:{id}</c> and on the post's press and category
+/// <see cref="Topic"/>; the hub checks <see cref="Permission"/> on <c>post:{id}</c> and on the post's press, categories and unit
 /// (from <see cref="PostLiveScopeResolver"/>).
 /// </summary>
 public static class PostLive
@@ -94,8 +94,9 @@ public sealed class LivePostPublisher(IContentStore store, IServiceProvider serv
 }
 
 /// <summary>
-/// The scopes of a post topic beyond <c>post:{id}</c>: the post's <c>press:</c> and <c>category:</c>, so a grant on the
-/// press or the category lets its holder subscribe. Unknown posts and other kinds: none.
+/// The scopes of a post topic beyond <c>post:{id}</c>: the post's <c>press:</c>, a <c>category:</c> per category, and
+/// <c>unit:</c> for its unit and every ancestor (<c>UnitScopes.For(path)</c>), so a grant on the press, a category or a unit
+/// above the post lets its holder subscribe. Unknown posts and other kinds: none.
 /// </summary>
 public sealed class PostLiveScopeResolver(IContentStore store) : ILiveScopeResolver
 {
@@ -103,6 +104,6 @@ public sealed class PostLiveScopeResolver(IContentStore store) : ILiveScopeResol
     {
         if (!string.Equals(kind, PostLive.Kind, StringComparison.OrdinalIgnoreCase)) return [];
         if (!int.TryParse(key, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) || id <= 0) return [];
-        return await store.PostScopesAsync(id, ct) is { } post ? [AccessScope.Press(post.PressId), AccessScope.Category(post.CategoryId)] : [];
+        return await store.PostScopesAsync(id, ct) is { } scopes ? [.. scopes] : [];
     }
 }

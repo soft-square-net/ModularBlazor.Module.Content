@@ -39,6 +39,7 @@ public sealed class ContentRoutes : ICarterModule
         Contents.Edit.Map(content);
         Contents.Act.Map(content);
         Contents.Assign.Map(content);
+        Contents.SetUnit.Map(content);
         Contents.Archive.Map(content);
         Contents.Delete.Map(content);
         Contents.GetPipeline.Map(content);
@@ -73,6 +74,8 @@ public sealed class ContentRoutes : ICarterModule
         Post<Posts.DetachContent>(posts, segment, documented);
         Post<Posts.ReorderContents>(posts, segment, documented);
         Post<Posts.SetSlugs>(posts, segment, documented);
+        Post<Posts.SetCategories>(posts, segment, documented);
+        Post<Posts.SetUnit>(posts, segment, documented);
         Post<Posts.Events>(posts, segment, documented);
     }
 

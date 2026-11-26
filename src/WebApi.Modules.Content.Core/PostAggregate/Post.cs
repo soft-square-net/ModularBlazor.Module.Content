@@ -1,11 +1,13 @@
 using System.Text.Json;
+using soft.square.net.WebApi.Modules.Content.Core.Common;
 using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 
 namespace soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 
 /// <summary>
-/// A Post of one press and category (aggregate root): a document with a URL. The aggregate enforces the state rules; who
+/// A Post of one press, in one or more of its categories (one of them primary), and optionally of one Organization unit
+/// (aggregate root): a document with a URL. The aggregate enforces the state rules; who
 /// may call each operation (grants, scopes, shifts) is decided in the application layer. Every change bumps
 /// <see cref="Version"/> (optimistic concurrency: the second of two racing assignments gets a conflict) and is recorded in
 /// <see cref="History"/>.
@@ -20,6 +22,7 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     private readonly List<PostEvent> _history = [];
     private readonly List<PostContent> _contents = [];
     private readonly List<PostSlug> _slugs = [];
+    private readonly List<PostCategory> _categories = [];
     private readonly List<(string Type, Guid? ContentId, string? Detail)> _feed = [];
 
     private Post() { } // EF Core
@@ -29,7 +32,8 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public string PublicId { get; private set; } = "";
     public string StablePublicId => string.IsNullOrWhiteSpace(PublicId) ? $"legacy-{Id}" : PublicId;
     public string PressId { get; private set; } = "";
-    public string CategoryId { get; private set; } = "";
+    /// <summary>The primary category (stored in the column <c>CategoryId</c>); always one of <see cref="Categories"/>.</summary>
+    public string PrimaryCategoryId { get; private set; } = "";
     public string Title { get; private set; } = "";
     public string Body { get; private set; } = "";
     /// <summary>Authoring document; schema ID/version are retained so edits can use the original field contract.</summary>
@@ -88,15 +92,40 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// <summary>The same references as stored (the mapped navigation; unordered).</summary>
     public IReadOnlyList<PostContent> ContentLinks => _contents;
     public IReadOnlyList<PostSlug> Slugs => _slugs;
+    /// <summary>The category rows as stored (the mapped navigation; unordered).</summary>
+    public IReadOnlyList<PostCategory> CategoryLinks => _categories;
 
-    /// <summary>The grant scopes of this Post: its press and its category.</summary>
-    public IReadOnlyCollection<string> Scopes => [$"press:{PressId}", $"category:{CategoryId}"];
+    /// <summary>The most categories one post is in.</summary>
+    public const int MaxCategories = 20;
+
+    /// <summary>The post's categories, all of its press: the primary one first, then the others in ordinal order.</summary>
+    public IReadOnlyList<string> Categories =>
+        [PrimaryCategoryId, .. _categories.Select(c => c.CategoryId).Where(c => c != PrimaryCategoryId).Distinct().Order(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// The Organization unit the post belongs to (set by the workflow, <c>content.unit.assign</c>); null when it has none.
+    /// </summary>
+    public Guid? UnitId { get; private set; }
+    /// <summary>The unit's path when it was set (<c>/{root}/.../{unit}</c>, N-form ids), kept in step with <c>org.unit-moved</c>.</summary>
+    public string? UnitPath { get; private set; }
+
+    /// <summary>
+    /// The grant scopes of this Post: its press, every category, and its unit with all its ancestors (<c>unit:{id}</c>), so
+    /// a grant on any of them covers it.
+    /// </summary>
+    public IReadOnlyCollection<string> Scopes => ScopesOf(PressId, Categories, UnitPath);
+
+    /// <summary>The scopes of a post of this press, in these categories, of the unit at this path (see <see cref="Scopes"/>).</summary>
+    public static IReadOnlyCollection<string> ScopesOf(string pressId, IEnumerable<string> categories, string? unitPath) =>
+        [$"press:{pressId}", .. categories.Distinct().Select(c => $"category:{c}"), .. UnitPathRules.Scopes(unitPath)];
 
     /// <summary>A new public id (a new post's contents are made before it, and name it as their origin).</summary>
     public static string NewPublicId() => Guid.NewGuid().ToString("N");
 
+    /// <param name="otherCategories">More categories of the same press (D4); the primary one is <paramref name="category"/>.</param>
     public static Post Create(string ownerId, Category category, string title, string body, DateTimeOffset now, string postKind = PostKinds.Article,
-        PostDocument? document = null, IReadOnlyList<ContentRef>? contents = null, string? publicId = null)
+        PostDocument? document = null, IReadOnlyList<ContentRef>? contents = null, string? publicId = null,
+        IReadOnlyList<Category>? otherCategories = null)
     {
         var kind = PostKinds.Require(postKind);
         var post = new Post
@@ -104,12 +133,12 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
             OwnerId = Require(ownerId, "an owner"),
             PublicId = publicId ?? NewPublicId(),
             PressId = category.PressId,
-            CategoryId = category.Id,
             PostKind = kind,
             State = PostState.Draft,
             CreatedAt = now,
             UpdatedAt = now
         };
+        post.SetCategories(category, otherCategories ?? []);
         post.SetText(title, body);
         if (contents is not null) post.SetContents(contents);
         post.SetDocument(document ?? PostDocument.FromLegacy(title, body));
@@ -258,6 +287,81 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
 
     private static IReadOnlyList<PostTranslation> ReadTranslations(string? json) =>
         string.IsNullOrWhiteSpace(json) ? [] : JsonSerializer.Deserialize<List<PostTranslation>>(json, PostJson.Options) ?? [];
+
+    /// <summary>
+    /// Sets the post's categories: <paramref name="primary"/> and <paramref name="categories"/> (which may repeat it), all of
+    /// the post's press (D4), at most <see cref="MaxCategories"/>. False when they are the ones it has. Who may, and whether
+    /// the post's unit still serves them, is the caller's check. A schedule or an approval stays valid: the document did not change.
+    /// </summary>
+    public bool ChangeCategories(string actor, Category primary, IReadOnlyList<Category> categories, DateTimeOffset now)
+    {
+        var wanted = Normalize(primary, categories);
+        if (wanted.Primary == PrimaryCategoryId && wanted.All.SequenceEqual(Categories)) return false;
+        ChangeMetadata(actor, "categories changed", now, () => SetCategories(primary, categories), string.Join(",", wanted.All));
+        return true;
+    }
+
+    /// <summary>
+    /// Puts the post in an Organization unit (<paramref name="unitPath"/> is its path, ending with its id), or takes it out of
+    /// any (null). False when nothing changes. Only the workflow may (the caller checks <c>content.unit.assign</c> and that
+    /// the unit's categories cover one of the post's). A schedule or an approval stays valid.
+    /// </summary>
+    public bool ChangeUnit(string actor, Guid? unitId, string? unitPath, DateTimeOffset now)
+    {
+        var path = UnitPathRules.Require(unitId, unitPath);
+        if (unitId == UnitId && path == UnitPath) return false;
+        ChangeMetadata(actor, unitId is null ? "unit removed" : "unit set", now, () =>
+        {
+            UnitId = unitId;
+            UnitPath = path;
+        }, unitId is null ? null : UnitPathRules.Id(unitId.Value));
+        return true;
+    }
+
+    /// <summary>
+    /// The unit, or one above it, moved in Organization (<c>org.unit-moved.v1</c>): its path is rebased. Not a change of the post
+    /// (no version, no history). False when the post's unit is not at or below <paramref name="oldPath"/>.
+    /// </summary>
+    public bool RebaseUnit(string oldPath, string newPath)
+    {
+        if (UnitPathRules.Rebase(UnitPath, oldPath, newPath) is not { } rebased) return false;
+        UnitPath = rebased;
+        return true;
+    }
+
+    private void SetCategories(Category primary, IReadOnlyList<Category> categories)
+    {
+        var (primaryId, all) = Normalize(primary, categories);
+        PrimaryCategoryId = primaryId;
+        _categories.RemoveAll(c => !all.Contains(c.CategoryId));
+        foreach (var id in all.Where(id => _categories.All(c => c.CategoryId != id))) _categories.Add(new PostCategory(id));
+    }
+
+    private (string Primary, IReadOnlyList<string> All) Normalize(Category primary, IReadOnlyList<Category> categories)
+    {
+        var press = string.IsNullOrEmpty(PressId) ? primary.PressId : PressId;
+        IReadOnlyList<Category> every = [primary, .. categories];
+        foreach (var category in every)
+            if (category.PressId != press)
+                throw new DomainException($"Category '{category.Id}' is of press '{category.PressId}', not of the post's press '{press}': a post's categories are all of its press.");
+        var ids = every.Select(c => c.Id).Distinct().ToList();
+        if (ids.Count > MaxCategories) throw new DomainException($"A Post is in at most {MaxCategories} categories.");
+        return (primary.Id, [primary.Id, .. ids.Where(id => id != primary.Id).Order(StringComparer.Ordinal)]);
+    }
+
+    /// <summary>A change of what the post is filed under, not of its document: an approved or scheduled version stays the one.</summary>
+    private void ChangeMetadata(string actor, string action, DateTimeOffset now, Action apply, string? detail)
+    {
+        var scheduled = ScheduledVersion == Version;
+        var approved = ApprovedVersion == Version;
+        Change(actor, action, now, () =>
+        {
+            apply();
+            _feed.Add((FeedEventTypes.PostChanged, null, action));
+        }, detail);
+        if (scheduled) ScheduledVersion = Version;
+        if (approved) ApprovedVersion = Version;
+    }
 
     public void Submit(string actor, DateTimeOffset now)
     {

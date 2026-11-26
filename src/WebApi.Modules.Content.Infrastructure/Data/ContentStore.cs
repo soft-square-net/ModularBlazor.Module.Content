@@ -46,10 +46,27 @@ public sealed class ContentStore(ContentDbContext db) : IContentStore
         return rows.Select(r => (r.ContentId, r.PostId)).ToList();
     }
 
-    public async Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct)
+    public async Task<IReadOnlyCollection<string>?> PostScopesAsync(int postId, CancellationToken ct)
     {
-        var post = await db.Posts.Where(p => p.Id == postId).Select(p => new { p.PressId, p.CategoryId }).AsNoTracking().FirstOrDefaultAsync(ct);
-        return post is null ? null : (post.PressId, post.CategoryId);
+        var post = await db.Posts.Where(p => p.Id == postId)
+            .Select(p => new { p.PressId, p.PrimaryCategoryId, p.UnitPath, Categories = p.CategoryLinks.Select(c => c.CategoryId).ToList() })
+            .AsNoTracking().FirstOrDefaultAsync(ct);
+        return post is null ? null : Post.ScopesOf(post.PressId, [post.PrimaryCategoryId, .. post.Categories], post.UnitPath);
+    }
+
+    public async Task<IReadOnlyList<ContentItem>> ContentsInSectionAsync(string sectionId, CancellationToken ct) =>
+        await db.Contents.Where(c => c.SectionId == sectionId && c.UnitId == null).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Post>> PostsInUnitTreeAsync(string path, CancellationToken ct)
+    {
+        var below = path + "/";
+        return await db.Posts.Where(p => p.UnitPath == path || p.UnitPath!.StartsWith(below)).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ContentItem>> ContentsInUnitTreeAsync(string path, CancellationToken ct)
+    {
+        var below = path + "/";
+        return await db.Contents.Where(c => c.UnitPath == path || c.UnitPath!.StartsWith(below)).ToListAsync(ct);
     }
 
     public Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct) => db.PostContents.AnyAsync(c => c.ContentId == contentId, ct);

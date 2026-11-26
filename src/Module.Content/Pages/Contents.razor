@@ -63,13 +63,27 @@
             <div class="mud-input-wrapper mud-input-wrapper--select">
               <select id="ct-category" class="mud-input-slot" @bind="_form.CategoryId" required>
                 <option value="">@L["Choose…"]</option>
-                @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.Name))
+                @foreach (var category in _categories.OrderBy(c => c.PressId).ThenBy(c => c.NameEn))
                 {
-                  <option value="@category.Id">@PressName(category.PressId) / @category.Name</option>
+                  <option value="@category.Id">@PressName(category.PressId) / @CategoryName(category)</option>
                 }
               </select>
             </div>
+            <div class="mud-input-helper-text">@L["The primary category. A post may be in more categories of the same press."]</div>
           </div>
+          @if (SamePress(_form.CategoryId) is { Count: > 0 } others)
+          {
+            <fieldset class="mud-input-control ct-wide">
+              <legend class="mud-input-label">@L["More categories"]</legend>
+              @foreach (var category in others)
+              {
+                <label class="ct-check">
+                  <input type="checkbox" checked="@_form.Others.Contains(category.Id)" @onchange="e => Toggle(_form.Others, category.Id, e)" />
+                  @CategoryName(category)
+                </label>
+              }
+            </fieldset>
+          }
           <div class="mud-input-control">
             <label class="mud-input-label" for="ct-kind">@L["Kind"]</label>
             <div class="mud-input-wrapper mud-input-wrapper--select">
@@ -112,6 +126,7 @@
   private sealed class PostForm
   {
     public string CategoryId { get; set; } = "";
+    public HashSet<string> Others { get; } = [];
     public string Kind { get; set; } = "post.article";
     public string Title { get; set; } = "";
     public string? Body { get; set; }
@@ -157,7 +172,7 @@
     id = p.Id.ToString(),
     title = p.Title,
     kind = KindName(p.PostKind),
-    category = $"{PressName(p.PressId)} / {CategoryName(p.CategoryId)}",
+    category = $"{PressName(p.PressId)} / {CategoryLabel(p.CategoryId)}",
     state = Words(p.State),
     scheduled = When(p.ScheduledFor),
     updated = When(p.UpdatedAt),
@@ -165,7 +180,18 @@
 
   private string PressName(string id) => _presses.FirstOrDefault(p => p.Id == id)?.Name ?? id;
 
-  private string CategoryName(string id) => _categories.FirstOrDefault(c => c.Id == id)?.Name ?? id;
+  private string CategoryLabel(string id) => _categories.FirstOrDefault(c => c.Id == id) is { } category ? CategoryName(category) : id;
+
+  /// <summary>The other categories of the press of <paramref name="primary"/> (a post's categories are all of its press).</summary>
+  private List<CategoryDto> SamePress(string? primary) =>
+    _categories.FirstOrDefault(c => c.Id == primary) is { } chosen
+      ? _categories.Where(c => c.PressId == chosen.PressId && c.Id != chosen.Id).OrderBy(c => c.NameEn).ToList()
+      : [];
+
+  private static void Toggle(HashSet<string> set, string id, ChangeEventArgs e)
+  {
+    if (e.Value is true) set.Add(id); else set.Remove(id);
+  }
 
   private async Task ViewChangedAsync(ChangeEventArgs e)
   {
@@ -187,6 +213,7 @@
       created = await Content.CreatePostAsync(new NewPost
       {
         CategoryId = form.CategoryId,
+        CategoryIds = SamePress(form.CategoryId).Select(c => c.Id).Where(form.Others.Contains).ToList(),
         Title = form.Title.Trim(),
         Body = string.IsNullOrWhiteSpace(form.Body) ? null : form.Body,
         PostKind = form.Kind,

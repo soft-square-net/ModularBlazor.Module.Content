@@ -28,7 +28,7 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
         var served = PostTranslationRules.Chain(query.Culture, translations.Select(t => t.Language));
         var chain = served.Select(language => translations.First(t => t.Language == language)).ToList();
         return new PublishedPost(post.Id, post.StablePublicId, PostDetails.Permalink(post.StablePublicId), post.PostKind, post.PressId,
-            post.CategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion,
+            post.PrimaryCategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion,
             PostTranslationRules.Apply(document, chain), translations.Select(t => t.Language).ToList(), served,
             post.PublishedUrlPrefix, post.CanonicalPath([.. served, .. CultureChain(query.Culture)]));
     }

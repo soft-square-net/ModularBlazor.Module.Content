@@ -16,7 +16,7 @@ public sealed class AddCategoryHandler(IReadRepository<Press> presses, IReposito
         if (await categories.GetByIdAsync(command.Id, ct) is not null)
             return Result<CategoryDto>.Conflict($"Category '{command.Id}' exists already.");
 
-        var category = await categories.AddAsync(Category.Create(command.Id, command.PressId, command.Name), ct);
-        return new CategoryDto(category.Id, category.PressId, category.Name);
+        var category = await categories.AddAsync(Category.Create(command.Id, command.PressId, command.NameEn, command.NameAr), ct);
+        return CategoryDto.From(category);
     }
 }

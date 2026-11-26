@@ -31,3 +31,6 @@
 .ct-translations { margin: 0 0 8px; padding-inline-start: 20px; }
 .ct-translations li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
 .ct-row-actions:has(.ct-inline) { align-items: flex-end; }
+
+/* A checkbox with its label (a post's other categories). */
+.ct-check { display: inline-flex; align-items: center; gap: .35rem; margin-inline-end: 1rem; }

@@ -19,7 +19,7 @@
       @if (_post is not null)
       {
         <p class="mud-typography mud-typography-body1 ct-muted">
-          #@_post.Id · @KindName(_post.PostKind) · @_post.PressId / @_post.CategoryId · @L["version {0}", _post.Version]
+          #@_post.Id · @KindName(_post.PostKind) · @_post.PressId / @CategoryLabel(_post.CategoryId) · @L["version {0}", _post.Version]
         </p>
       }
     </div>
@@ -33,6 +33,9 @@
     <div class="ct-facts">
       <span class="ct-chip ct-state">@L["State"] <strong>@Words(_post.State)</strong></span>
       <span class="ct-chip">@L["Owner"] <strong>@_post.OwnerId</strong></span>
+      <span class="ct-chip" title="@L["Set by the workflow from the moderator's choice; it cannot be changed here."]">
+        @L["Unit"] <strong>@(_post.UnitId is { } unit ? unit.ToString("N")[..8] : L["none"].Value)</strong>
+      </span>
       @if (_post.AssigneeId is not null) { <span class="ct-chip">@L["Assignee"] <strong>@_post.AssigneeId</strong></span> }
       @if (_post.AcceptedShiftId is not null) { <span class="ct-chip">@L["Shift"] <strong>@_post.AcceptedShiftId</strong></span> }
       @if (_post.ScheduledFor is not null) { <span class="ct-chip">@L["Scheduled for"] <strong>@When(_post.ScheduledFor)</strong></span> }
@@ -108,6 +111,41 @@
           <button type="submit" class="mud-button-root mud-button-outlined mud-button-error mud-button-medium" disabled="@Busy">@L["Return to author"]</button>
         </form>
       }
+    </section>
+
+    <section class="mud-paper mud-elevation-1 ct-card">
+      <h2 class="mud-typography mud-typography-h6">@L["Categories"]</h2>
+      <p class="mud-typography mud-typography-body2 ct-muted">
+        @L["A post is in one primary category and any others of its press. Its unit is set by the workflow and is shown read-only."]
+      </p>
+      <form class="ct-form" @onsubmit="SaveCategoriesAsync" @onsubmit:preventDefault>
+        <div class="ct-grid">
+          <div class="mud-input-control">
+            <label class="mud-input-label" for="ct-primary">@L["Primary category"]</label>
+            <div class="mud-input-wrapper mud-input-wrapper--select">
+              <select id="ct-primary" class="mud-input-slot" @bind="_primary" required>
+                @foreach (var category in PressCategories)
+                {
+                  <option value="@category.Id">@CategoryName(category)</option>
+                }
+              </select>
+            </div>
+          </div>
+          <fieldset class="mud-input-control ct-wide">
+            <legend class="mud-input-label">@L["More categories"]</legend>
+            @foreach (var category in PressCategories.Where(c => c.Id != _primary))
+            {
+              <label class="ct-check">
+                <input type="checkbox" checked="@_others.Contains(category.Id)" @onchange="e => ToggleOther(category.Id, e)" />
+                @CategoryName(category)
+              </label>
+            }
+          </fieldset>
+        </div>
+        <div class="ct-row-actions">
+          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">@L["Save categories"]</button>
+        </div>
+      </form>
     </section>
 
     <section class="mud-paper mud-elevation-1 ct-card">
@@ -213,10 +251,36 @@
   private string? _assigneeId;
   private string? _returnReason;
   private DateTime? _publishAt;
+  private List<CategoryDto> _categories = [];
+  private string? _primary;
+  private HashSet<string> _others = [];
 
   protected override async Task OnParametersSetAsync() => await LoadAsync();
 
-  private async Task LoadAsync() => await RunAsync(async () => Show(await Content.GetPostAsync(Id)));
+  private async Task LoadAsync() => await RunAsync(async () =>
+  {
+    var client = Content;
+    _categories = (await client.ListCategoriesAsync()).ToList();
+    Show(await client.GetPostAsync(Id));
+  });
+
+  /// <summary>The categories of the post's press (a post's categories are all of its press).</summary>
+  private IEnumerable<CategoryDto> PressCategories =>
+    _post is null ? [] : _categories.Where(c => c.PressId == _post.PressId).OrderBy(c => c.NameEn);
+
+  private string CategoryLabel(string id) => _categories.FirstOrDefault(c => c.Id == id) is { } category ? CategoryName(category) : id;
+
+  private void ToggleOther(string id, ChangeEventArgs e)
+  {
+    if (e.Value is true) _others.Add(id); else _others.Remove(id);
+  }
+
+  private Task SaveCategoriesAsync() => StepAsync((c, v) => c.SetPostCategoriesAsync(Id, new PostCategories
+  {
+    Version = v,
+    PrimaryCategoryId = _primary ?? _post!.CategoryId,
+    CategoryIds = _others.Where(o => o != _primary).ToList(),
+  }), "Categories saved.");
 
   private void Show(PostDetail post)
   {
@@ -224,6 +288,8 @@
     _title = post.Title;
     _body = post.Body;
     _shiftId ??= post.AcceptedShiftId;
+    _primary = post.CategoryId;
+    _others = [.. post.Categories.Where(c => c != post.CategoryId)];
     _publishAt ??= post.ScheduledFor?.LocalDateTime ?? DateTime.Now.AddHours(1);
   }
 

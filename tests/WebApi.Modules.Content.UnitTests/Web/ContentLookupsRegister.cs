@@ -21,10 +21,10 @@ public sealed class ContentLookupsRegister
         var categories = _lookups.Definitions.ShouldHaveSingleItem();
         categories.Name.ShouldBe("categories");
         categories.Entity.ShouldBe(typeof(Category));
-        categories.SearchOn.ShouldBe(["Name", "Id"]);
+        categories.SearchOn.ShouldBe(["NameEn", "NameAr", "Id"]);
         categories.Parent.ShouldBe("PressId");
         categories.Filters.ShouldBe(["PressId"]);
-        categories.Columns.ShouldBe(["PressId"]);
+        categories.Columns.ShouldBe(["PressId", "NameEn", "NameAr"]);
         // Like GET /categories: a signed-in user, no permission.
         categories.Permission.ShouldBeNull();
         categories.Label.ShouldBe("Categories");
@@ -34,7 +34,7 @@ public sealed class ContentLookupsRegister
     public void TheKeyIsTheIdAndTheTextIsTheName()
     {
         var categories = _lookups.Definitions.Single();
-        var sports = Category.Create("ahram-sports", "ahram", "Sports");
+        var sports = Category.Create("ahram-sports", "ahram", "Sports", "رياضة");
 
         categories.Key!.Compile().DynamicInvoke(sports).ShouldBe("ahram-sports");
         categories.Text!.Compile().DynamicInvoke(sports).ShouldBe("Sports");

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using soft.square.net.WebApi.Contracts;
 using soft.square.net.WebApi.Modules.Content.UseCases;
 using soft.square.net.WebApi.Modules.Content.UseCases.Live;
+using soft.square.net.WebApi.Modules.Content.UseCases.Units;
 using soft.square.net.WebApi.Modules.Content.Web.Configurations;
 
 namespace soft.square.net.WebApi.Modules.Content.Web;
@@ -11,7 +12,9 @@ namespace soft.square.net.WebApi.Modules.Content.Web;
 /// Contents module: presses, categories and Posts with the newsroom workflow of the auth design. Tenant data (schema
 /// "content" in each tenant's database). Rights come from grants: standing ones (author, editor) from admins, shift
 /// ones (accept, assign, transfer, return, review, publish) from the shifts module's rota, so they hold only while the
-/// shift runs.
+/// shift runs. Posts are filed in categories of their press and, by the workflow, in an Organization unit; the module
+/// publishes <c>content.post-categories-changed.v1</c> and <c>content.post-unit-changed.v1</c> and follows
+/// <c>shifts.section-moved.v1</c> and <c>org.unit-*.v1</c>.
 /// This is the composition root (the template's Program.cs): the runtime creates it, reads the manifest and calls
 /// <see cref="ConfigureServices"/> on the module's own container; the endpoints are in <see cref="ContentRoutes"/>.
 /// </summary>
@@ -21,10 +24,12 @@ public sealed class ContentModule : IRuntimeModule
     {
         Description = "Newsroom posts (article, news, video, reportage, and other post kinds), taxonomy, review and publishing workflow.",
         DefaultSettings = new Dictionary<string, string?> { ["Content:OwnerEditWindow"] = "1.00:00:00", ["Content:EventDelay"] = "00:00:02",
-            ["Content:ApiBaseUrl"] = "http://localhost:5080", ["Content:PostKindCacheSeconds"] = "60" },
+            ["Content:ApiBaseUrl"] = "http://localhost:5080", ["Content:PostKindCacheSeconds"] = "60", ["Content:UnitCacheSeconds"] = "60" },
         Permissions = ContentPermissions.All,
         // content:post:{id}: a nudge for every new row of the post's feed (see PostLive).
-        LiveTopics = [PostLive.Topic]
+        LiveTopics = [PostLive.Topic],
+        // Integration events it follows: a Shifts section that moved to Organization, and Organization's unit changes.
+        Subscriptions = [SectionMovedHandler.Type, OrgUnitEventsHandler.Pattern]
     };
 
     public void ConfigureServices(IServiceCollection services, IConfiguration settings) => services.AddServiceConfigs(settings);

@@ -158,7 +158,7 @@ public sealed class PostDocumentSplit(IContentStore store, PostContents postCont
             }
             else
             {
-                var created = ContentItem.Create(actor, post.PressId, post.CategoryId, post.StablePublicId, child, pipeline.StartStage, now);
+                var created = ContentItem.Create(actor, post.PressId, post.PrimaryCategoryId, post.StablePublicId, child, pipeline.StartStage, now);
                 store.Add(created);
                 contents[created.Id] = created;
                 order.Add(new ContentRef(created.Id));

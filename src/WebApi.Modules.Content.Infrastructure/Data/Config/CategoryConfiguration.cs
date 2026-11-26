@@ -11,7 +11,8 @@ public sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
         category.ToTable("categories");
         category.Property(c => c.Id).HasMaxLength(DataSchemaConstants.SlugLength);
         category.Property(c => c.PressId).HasMaxLength(DataSchemaConstants.SlugLength);
-        category.Property(c => c.Name).HasMaxLength(DataSchemaConstants.NameLength);
+        category.Property(c => c.NameEn).HasMaxLength(DataSchemaConstants.NameLength);
+        category.Property(c => c.NameAr).HasMaxLength(DataSchemaConstants.NameLength);
         category.HasIndex(c => c.PressId);
     }
 }

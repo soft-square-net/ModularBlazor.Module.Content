@@ -11,6 +11,9 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 /// while the kind has no published root field, or DynamicFields cannot answer: the post then cannot be published).
 /// <see cref="CanonicalPath"/> is the live version's public path, <c>/{prefix}/{slug}</c> with the prefix it was published
 /// under (null until it is published under one).</para>
+/// <para><see cref="CategoryId"/> is the primary category, the first of <see cref="Categories"/> (all of the post's press).
+/// <see cref="UnitId"/>/<see cref="UnitPath"/>: the Organization unit the post belongs to, set by the workflow only (read-only
+/// for everyone else); null when it has none.</para>
 /// </summary>
 public sealed record PostDetail(int Id, string PostKind, string PressId, string CategoryId, string Title, string Body, string OwnerId, PostState State,
     int Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? SubmittedAt, bool OwnerMayEdit, string? AcceptedBy,
@@ -19,7 +22,8 @@ public sealed record PostDetail(int Id, string PostKind, string PressId, string 
     DateTimeOffset? PublishedAt, string? PublishedBy, string? PublishedTitle, string? PublishedBody,
     string? TransferredFromShift, IReadOnlyList<PostEventDto> History, string PublicId, string Permalink,
     string SchemaId, int SchemaVersion, PostDocument Document, IReadOnlyList<PostTranslation> Translations,
-    IReadOnlyList<PostContentDto> Contents, IReadOnlyDictionary<string, string> Slugs, string? UrlPrefix, string? CanonicalPath);
+    IReadOnlyList<PostContentDto> Contents, IReadOnlyDictionary<string, string> Slugs, string? UrlPrefix, string? CanonicalPath,
+    IReadOnlyList<string> Categories, Guid? UnitId, string? UnitPath);
 
 /// <summary>One entry of <see cref="PostDetail.History"/>.</summary>
 public sealed record PostEventDto(DateTimeOffset At, string Actor, string Action, PostState State, string? Detail);

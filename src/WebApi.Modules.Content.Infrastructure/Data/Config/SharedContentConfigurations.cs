@@ -21,6 +21,7 @@ public sealed class ContentItemConfiguration : IEntityTypeConfiguration<ContentI
         c.Property(x => x.CategoryId).HasMaxLength(DataSchemaConstants.SlugLength);
         c.Property(x => x.OriginPostId).HasMaxLength(40);
         c.Property(x => x.SectionId).HasMaxLength(DataSchemaConstants.SlugLength);
+        c.Property(x => x.UnitPath).HasMaxLength(soft.square.net.WebApi.Modules.Content.Core.Common.UnitPathRules.MaxLength);
         c.Property(x => x.AssigneeId).HasMaxLength(DataSchemaConstants.UserIdLength);
         c.Property(x => x.CreatedBy).HasMaxLength(DataSchemaConstants.UserIdLength);
         c.Property(x => x.Stage).HasMaxLength(ContentItem.StageLength);
@@ -31,6 +32,7 @@ public sealed class ContentItemConfiguration : IEntityTypeConfiguration<ContentI
         c.Ignore(x => x.IsArchived);
         c.HasIndex(x => new { x.Stage, x.SectionId });
         c.HasIndex(x => x.AssigneeId);
+        c.HasIndex(x => x.UnitId);
         c.HasIndex(x => x.CategoryId);
         c.HasIndex(x => x.UpdatedAt);
         c.HasMany(x => x.Revisions).WithOne().HasForeignKey(r => r.ContentId).OnDelete(DeleteBehavior.Cascade);

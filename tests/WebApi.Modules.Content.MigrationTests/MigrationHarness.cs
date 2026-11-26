@@ -24,6 +24,10 @@ namespace soft.square.net.WebApi.Modules.Content.MigrationTests;
 /// <item>every migration applies to an empty database, in order;</item>
 /// <item>the data step of <c>PostKindsAsFieldKeys</c> works both ways: down to the enum names, up to the field keys,
 /// in the kind columns and in the stored JSON;</item>
+/// <item>the data step of <c>UnitsAndCategories</c>: posts and contents keep their unit, a post its categories; down and
+/// up again, a post's single category (<c>articles.CategoryId</c>) becomes its <c>post_categories</c> row and each category's
+/// Arabic name starts as its English one;</item>
+/// <item>the integration outbox and inbox tables exist (Content publishes and subscribes);</item>
 /// <item>every migration's Down runs (down to an empty schema), and every Up again.</item>
 /// </list>
 /// Without Docker the database tests are skipped.
@@ -34,6 +38,13 @@ public abstract class MigrationHarness
 
     /// <summary>The migration that turns the kinds into field keys (its id ends with this name on every engine).</summary>
     private const string KindsMigration = "_PostKindsAsFieldKeys";
+
+    /// <summary>The migration of the post categories, the category names and the units.</summary>
+    private const string UnitsMigration = "_UnitsAndCategories";
+
+    private static readonly Guid Root = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private static readonly Guid Desk = Guid.Parse("22222222-2222-2222-2222-222222222222");
+    private static string DeskPath => $"/{Root:N}/{Desk:N}";
 
     protected abstract DatabaseProvider Provider { get; }
 
@@ -78,8 +89,46 @@ public abstract class MigrationHarness
             (await context.Database.GetPendingMigrationsAsync(Ct)).ShouldBeEmpty();
         }
 
-        // 2. Posts and contents of the new kinds, then down to the enum names (the step before the kinds migration).
+        // 2. Posts and contents of the new kinds, in two categories and a unit; they read back through EF.
         await SeedAsync(connection);
+        await using (var context = Context(connection))
+        {
+            var post = await context.Posts.AsNoTracking().SingleAsync(Ct);
+            post.Categories.ShouldBe(["politics", "economy"]);
+            post.UnitId.ShouldBe(Desk);
+            post.UnitPath.ShouldBe(DeskPath);
+            post.Scopes.ShouldContain($"unit:{Root:N}");
+            var content = await context.Contents.AsNoTracking().SingleAsync(Ct);
+            content.UnitId.ShouldBe(Desk);
+            content.Scopes.ShouldContain($"section:{Desk:N}");
+            (await context.Categories.AsNoTracking().SingleAsync(c => c.Id == "politics", Ct)).NameAr.ShouldBe("السياسة");
+            (await Count(context, "integration_outbox")).ShouldBe(0);
+            (await Count(context, "integration_inbox")).ShouldBe(0);
+        }
+
+        // 3. Down to the step before the units migration, and up again: the primary category becomes the post's row of
+        // post_categories (the others were in the dropped table), and the Arabic names start as the English ones.
+        await using (var context = Context(connection))
+        {
+            var all = context.Database.GetMigrations().ToList();
+            var units = all.FindIndex(m => m.EndsWith(UnitsMigration, StringComparison.Ordinal));
+            units.ShouldBeGreaterThan(0, "the units migration exists");
+            await context.GetService<IMigrator>().MigrateAsync(all[units - 1], Ct);
+            (await Scalars(context, "categories", "Name")).Order().ShouldBe(["Economy", "Politics"]);
+        }
+        await using (var context = Context(connection))
+        {
+            await context.Database.MigrateAsync(Ct);
+            (await Scalars(context, "post_categories", "CategoryId")).ShouldBe(["politics"]);
+            (await Scalars(context, "categories", "NameAr")).Order().ShouldBe(["Economy", "Politics"]);
+            var post = await context.Posts.AsNoTracking().SingleAsync(Ct);
+            post.Categories.ShouldBe(["politics"]);
+            post.PrimaryCategoryId.ShouldBe("politics");
+            post.UnitId.ShouldBeNull();
+            (await context.Categories.AsNoTracking().SingleAsync(c => c.Id == "politics", Ct)).NameEn.ShouldBe("Politics");
+        }
+
+        // 4. Down to the enum names (the step before the kinds migration).
         string previous;
         await using (var context = Context(connection))
         {
@@ -100,7 +149,7 @@ public abstract class MigrationHarness
             (await Scalar(context, "content_revisions", "ValuesJson")).ShouldContain("\"postKind\":\"PhotoStory\"");
         }
 
-        // 3. Up again: the enum names become field keys.
+        // 5. Up again: the enum names become field keys.
         await using (var context = Context(connection))
         {
             await context.Database.MigrateAsync(Ct);
@@ -117,7 +166,7 @@ public abstract class MigrationHarness
             content.Node.PostKind.ShouldBe(PostKinds.PhotoStory);
         }
 
-        // 4. Every Down, then every Up again.
+        // 6. Every Down, then every Up again.
         await using (var context = Context(connection))
         {
             await context.GetService<IMigrator>().MigrateAsync(Migration.InitialDatabase, Ct);
@@ -127,19 +176,39 @@ public abstract class MigrationHarness
         }
     }
 
-    /// <summary>A post of kind post.video whose document has one photo-story node, and a content of that node (one row each).</summary>
+    /// <summary>
+    /// A post of kind post.video whose document has one photo-story node, and a content of that node (one row each); the post is
+    /// in two categories of its press and in a unit, the content in the same unit.
+    /// </summary>
     private async Task SeedAsync(string connection)
     {
         await using var context = Context(connection);
         var press = Press.Create("daily", "Daily");
-        var category = Category.Create("politics", "daily", "Politics");
+        var category = Category.Create("politics", "daily", "Politics", "السياسة");
+        var economy = Category.Create("economy", "daily", "Economy");
         var node = new PostNode("n1", PostKinds.PhotoStory, "block.paragraph", 1, Json("""{ "text": "One" }"""), Json("{}"), []);
         var content = ContentItem.Create("owner-1", "daily", "politics", null, node, "draft", Now);
+        content.ChangeUnit("workflow", Desk, DeskPath, Now);
         var document = new PostDocument("post.video", 1, Json("""{ "headline": "A title" }"""), Json("{}"), [node]);
         // A body: Oracle stores '' as NULL, and Body is required (a known gap, see the C1 handover).
-        var post = Post.Create("owner-1", category, "A title", "A body", Now, PostKinds.Video, document);
-        context.AddRange(press, category, content, post);
+        var post = Post.Create("owner-1", category, "A title", "A body", Now, PostKinds.Video, document, otherCategories: [economy]);
+        post.ChangeUnit("workflow", Desk, DeskPath, Now);
+        context.AddRange(press, category, economy, content, post);
         await context.SaveChangesAsync(Ct);
+    }
+
+    /// <summary>The values of a column of a table, every row.</summary>
+    private async Task<List<string>> Scalars(ContentDbContext context, string table, string column)
+    {
+        var sql = $"SELECT {Column(column)} AS {Column("Value")} FROM {Table(table)}"; // names only, from this class
+        return await context.Database.SqlQueryRaw<string>(sql).ToListAsync(Ct);
+    }
+
+    /// <summary>The number of rows of a table.</summary>
+    private Task<int> Count(ContentDbContext context, string table)
+    {
+        var sql = $"SELECT COUNT(*) AS {Column("Value")} FROM {Table(table)}"; // names only, from this class
+        return context.Database.SqlQueryRaw<int>(sql).SingleAsync(Ct);
     }
 
     /// <summary>The value of a column of a table that holds one row (the seed's).</summary>

@@ -45,12 +45,12 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
             : JsonSerializer.Deserialize<PostDocument>(json, Json) ?? throw new InvalidOperationException(invalidMessage);
 
     private static PostContentDto ToDto(PostContent link, ContentItem? c) => c is null
-        ? new(link.ContentId, link.Order, link.Required, link.PinnedRevision, "", "", 0, "", null, null, 0, null, null, 0, true, false)
+        ? new(link.ContentId, link.Order, link.Required, link.PinnedRevision, "", "", 0, "", null, null, 0, null, null, 0, true, false, null)
         : new(link.ContentId, link.Order, link.Required, link.PinnedRevision, c.NodeId, c.FieldKey, c.FieldVersion, c.Stage, c.SectionId,
             c.AssigneeId, c.Revision, c.AcceptedRevision, c.ReviewNote, c.Version, c.IsArchived,
-            link.PinnedRevision is { } pinned && c.AcceptedRevision is { } accepted && accepted > pinned);
+            link.PinnedRevision is { } pinned && c.AcceptedRevision is { } accepted && accepted > pinned, c.UnitId);
 
-    private PostDetail ToDetail(Post a, IReadOnlyDictionary<Guid, ContentItem> items, string? urlPrefix) => new(a.Id, a.PostKind, a.PressId, a.CategoryId, a.Title, a.Body, a.OwnerId, a.State, a.Version,
+    private PostDetail ToDetail(Post a, IReadOnlyDictionary<Guid, ContentItem> items, string? urlPrefix) => new(a.Id, a.PostKind, a.PressId, a.PrimaryCategoryId, a.Title, a.Body, a.OwnerId, a.State, a.Version,
         a.CreatedAt, a.UpdatedAt, a.SubmittedAt, a.OwnerMayEdit(access.Now, options.Value.OwnerEditWindow), a.AcceptedBy,
         a.AcceptedAt, a.AcceptedShiftId, a.AssigneeId,
         a.AssignedShiftId, a.ReviewerId, a.ScheduledFor, a.ScheduledBy, a.PublishedAt, a.PublishedBy,
@@ -61,5 +61,5 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
         a.Translations,
         a.Contents.Select(link => ToDto(link, items.GetValueOrDefault(link.ContentId))).ToList(),
         a.Slugs.OrderBy(s => s.Culture).ToDictionary(s => s.Culture, s => s.Slug),
-        urlPrefix, a.CanonicalPath());
+        urlPrefix, a.CanonicalPath(), a.Categories, a.UnitId, a.UnitPath);
 }

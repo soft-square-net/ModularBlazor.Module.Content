@@ -102,7 +102,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CategoryDto"
+                "$ref": "#/components/schemas/NewCategory"
               }
             }
           },
@@ -217,6 +217,14 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "unitId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -471,6 +479,48 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ContentAssignment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/content/contents/{id}/unit": {
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Give the content to an Organization unit that serves its category (the workflow only).",
+        "operationId": "Content_SetContentUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitAssignment"
               }
             }
           },
@@ -1384,6 +1434,92 @@
         }
       }
     },
+    "/api/content/posts/{id}/categories": {
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Set the post's categories (a primary one and others, all of its press).",
+        "operationId": "Content_SetPostCategories",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostCategories"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/content/posts/{id}/unit": {
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Put the post in an Organization unit that serves one of its categories (the workflow only).",
+        "operationId": "Content_SetPostUnit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnitAssignment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/content/posts/{id}/events": {
       "get": {
         "tags": [
@@ -1567,7 +1703,9 @@
         "required": [
           "id",
           "pressId",
-          "name"
+          "name",
+          "nameEn",
+          "nameAr"
         ],
         "type": "object",
         "properties": {
@@ -1578,6 +1716,12 @@
             "type": "string"
           },
           "name": {
+            "type": "string"
+          },
+          "nameEn": {
+            "type": "string"
+          },
+          "nameAr": {
             "type": "string"
           }
         }
@@ -1655,7 +1799,9 @@
           "revisions",
           "history",
           "actions",
-          "canEdit"
+          "canEdit",
+          "unitId",
+          "unitPath"
         ],
         "type": "object",
         "properties": {
@@ -1765,6 +1911,19 @@
           },
           "canEdit": {
             "type": "boolean"
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "unitPath": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1917,7 +2076,8 @@
           "acceptedRevision",
           "version",
           "updatedAt",
-          "archived"
+          "archived",
+          "unitId"
         ],
         "type": "object",
         "properties": {
@@ -1983,6 +2143,13 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -2097,6 +2264,39 @@
         }
       },
       "JsonElement": { },
+      "NewCategory": {
+        "required": [
+          "id",
+          "pressId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pressId": {
+            "type": "string"
+          },
+          "nameEn": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "nameAr": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "NewContent": {
         "required": [
           "categoryId",
@@ -2185,6 +2385,15 @@
                 "$ref": "#/components/schemas/PostDocument"
               }
             ]
+          },
+          "categoryIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -2313,6 +2522,31 @@
           }
         }
       },
+      "PostCategories": {
+        "required": [
+          "version",
+          "primaryCategoryId"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "primaryCategoryId": {
+            "type": "string"
+          },
+          "categoryIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "PostContentAttachment": {
         "required": [
           "version",
@@ -2358,7 +2592,8 @@
           "reviewNote",
           "version",
           "archived",
-          "drift"
+          "drift",
+          "unitId"
         ],
         "type": "object",
         "properties": {
@@ -2431,6 +2666,13 @@
           },
           "drift": {
             "type": "boolean"
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -2491,7 +2733,10 @@
           "contents",
           "slugs",
           "urlPrefix",
-          "canonicalPath"
+          "canonicalPath",
+          "categories",
+          "unitId",
+          "unitPath"
         ],
         "type": "object",
         "properties": {
@@ -2670,6 +2915,25 @@
             ]
           },
           "canonicalPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "unitPath": {
             "type": [
               "null",
               "string"
@@ -2860,7 +3124,8 @@
           "submittedAt",
           "scheduledFor",
           "transferredFromShift",
-          "updatedAt"
+          "updatedAt",
+          "unitId"
         ],
         "type": "object",
         "properties": {
@@ -2932,6 +3197,13 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -3168,6 +3440,26 @@
           },
           "sourceHash": {
             "type": "string"
+          }
+        }
+      },
+      "UnitAssignment": {
+        "required": [
+          "version",
+          "unitId"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unitId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
