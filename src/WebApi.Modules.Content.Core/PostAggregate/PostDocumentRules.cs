@@ -39,7 +39,7 @@ public static class PostDocumentRules
         if (string.IsNullOrWhiteSpace(node.NodeId) || node.NodeId.Length > 64)
             throw new DomainException("Every Post node needs a node id (at most 64 characters).");
         if (!ids.Add(node.NodeId)) throw new DomainException($"Post node id '{node.NodeId}' is duplicated.");
-        if (!Enum.IsDefined(node.PostKind)) throw new DomainException($"Unsupported postKind '{node.PostKind}'.");
+        if (!PostKinds.IsKey(node.PostKind)) throw new DomainException($"Unsupported postKind '{node.PostKind}': a root field key such as {PostKinds.Article}.");
         if (string.IsNullOrWhiteSpace(node.SchemaId) || node.SchemaId.Length > 128 || node.SchemaVersion < 1)
             throw new DomainException("Every Post node needs a valid schema id and positive version.");
         RequireObject(node.Content, "Node Content");

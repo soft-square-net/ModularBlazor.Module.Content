@@ -3,6 +3,11 @@
   <!-- Integration tests of Infrastructure: the ContentDbContext mappings and the specifications against a real
        relational database (SQLite in memory), through the platform's repositories. -->
 
+  <!-- The DynamicFields client (DynamicFieldsPostKinds) reads the caller's request through ASP.NET Core's HttpContext. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
     <!-- The host-shared data layer (EF Core, the platform repositories), which the module compiles against only. -->

@@ -16,7 +16,7 @@ public sealed class ContentItemConfiguration : IEntityTypeConfiguration<ContentI
         c.Property(x => x.Id).ValueGeneratedNever();
         c.Property(x => x.NodeId).HasMaxLength(ContentItem.NodeIdLength);
         c.Property(x => x.FieldKey).HasMaxLength(128);
-        c.Property(x => x.PostKind).HasConversion<string>().HasMaxLength(32);
+        c.Property(x => x.PostKind).HasMaxLength(PostKinds.MaxLength);
         c.Property(x => x.PressId).HasMaxLength(DataSchemaConstants.SlugLength);
         c.Property(x => x.CategoryId).HasMaxLength(DataSchemaConstants.SlugLength);
         c.Property(x => x.OriginPostId).HasMaxLength(40);

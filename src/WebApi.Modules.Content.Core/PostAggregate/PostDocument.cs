@@ -2,15 +2,22 @@ using System.Text.Json;
 
 namespace soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 
-/// <summary>One nested content item. Nodes share the root Post's workflow and permanent URL.</summary>
+/// <summary>
+/// One nested content item. Nodes share the root Post's workflow and permanent URL. <see cref="PostKind"/> is the kind
+/// of the post it was made for, a root field key (old enum names are read as their keys, see <see cref="PostKinds"/>);
+/// none means <see cref="PostKinds.Article"/>, as the old enum's default did.
+/// </summary>
 public sealed record PostNode(
     string NodeId,
-    PostKind PostKind,
+    string PostKind,
     string SchemaId,
     int SchemaVersion,
     JsonElement Content,
     JsonElement Style,
-    IReadOnlyList<PostNode> Children);
+    IReadOnlyList<PostNode> Children)
+{
+    public string PostKind { get; init; } = string.IsNullOrWhiteSpace(PostKind) ? PostKinds.Article : PostKinds.Normalize(PostKind);
+}
 
 /// <summary>
 /// Versioned Post form data and composition. Content and Style are independent JSON objects;

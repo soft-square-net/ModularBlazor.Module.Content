@@ -98,6 +98,25 @@ public abstract class ContentPageBase : ComponentBase
 
     protected static string When(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "";
 
+    /// <summary>
+    /// The post kinds a new post offers: the DynamicFields root post fields of the old enum (a tenant may publish more, and
+    /// the post form accepts any key).
+    /// </summary>
+    protected static readonly IReadOnlyList<string> KnownKinds =
+        ["post.article", "post.news", "post.video", "post.reportage", "post.photo-story", "post.other"];
+
+    /// <summary>A post kind (a root field key) by name: "post.photo-story" → "Photo story", in the user's language; another key as it is.</summary>
+    protected string KindName(string? kind) => kind switch
+    {
+        "post.article" => L["Article"],
+        "post.news" => L["News"],
+        "post.video" => L["Video"],
+        "post.reportage" => L["Reportage"],
+        "post.photo-story" => L["Photo story"],
+        "post.other" => L["Other"],
+        _ => kind ?? ""
+    };
+
     /// <summary>"InReview" → "In review", in the user's language (the key is the English words).</summary>
     protected string Words(Enum value) => L[EnglishWords(value)];
 

@@ -16,12 +16,24 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                 type: "longtext",
                 nullable: true);
 
+            // MySQL rejects a literal DEFAULT on a TEXT column: add it nullable, fill it, then require it. The application
+            // always writes TranslationsJson, so this engine needs no column default (found by the migration harness).
             migrationBuilder.AddColumn<string>(
                 name: "TranslationsJson",
                 table: "content_articles",
                 type: "longtext",
+                nullable: true);
+
+            migrationBuilder.Sql("UPDATE content_articles SET TranslationsJson = '[]' WHERE TranslationsJson IS NULL");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "TranslationsJson",
+                table: "content_articles",
+                type: "longtext",
                 nullable: false,
-                defaultValue: "[]");
+                oldClrType: typeof(string),
+                oldType: "longtext",
+                oldNullable: true);
         }
 
         /// <inheritdoc />

@@ -140,8 +140,8 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
 
                     b.Property<string>("PostKind")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("PressId")
                         .IsRequired()
@@ -399,9 +399,9 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.Property<string>("PostKind")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("Article")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("post.article")
                         .HasColumnName("Type");
 
                     b.Property<string>("PressId")
@@ -433,6 +433,10 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
 
                     b.Property<string>("PublishedTranslationsJson")
                         .HasColumnType("text");
+
+                    b.Property<string>("PublishedUrlPrefix")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ReviewerId")
                         .HasMaxLength(128)

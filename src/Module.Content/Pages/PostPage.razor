@@ -19,7 +19,7 @@
       @if (_post is not null)
       {
         <p class="mud-typography mud-typography-body1 ct-muted">
-          #@_post.Id · @Words(_post.PostKind) · @_post.PressId / @_post.CategoryId · @L["version {0}", _post.Version]
+          #@_post.Id · @KindName(_post.PostKind) · @_post.PressId / @_post.CategoryId · @L["version {0}", _post.Version]
         </p>
       }
     </div>
@@ -38,6 +38,8 @@
       @if (_post.ScheduledFor is not null) { <span class="ct-chip">@L["Scheduled for"] <strong>@When(_post.ScheduledFor)</strong></span> }
       @if (_post.PublishedAt is not null) { <span class="ct-chip">@L["Published"] <strong>@When(_post.PublishedAt)</strong></span> }
       @if (!string.IsNullOrEmpty(_post.Permalink)) { <span class="ct-chip">@L["Permalink"] <strong>@_post.Permalink</strong></span> }
+      @if (!string.IsNullOrEmpty(_post.CanonicalPath)) { <span class="ct-chip">@L["Public path"] <strong>@_post.CanonicalPath</strong></span> }
+      else if (string.IsNullOrEmpty(_post.UrlPrefix)) { <span class="ct-chip">@L["No URL prefix: this kind has no published DynamicFields root field, so the post cannot be published yet."]</span> }
     </div>
   }
 

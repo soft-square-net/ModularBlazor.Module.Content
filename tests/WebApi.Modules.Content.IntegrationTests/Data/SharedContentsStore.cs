@@ -26,7 +26,7 @@ public sealed class SharedContentsStore : IDisposable
     private static JsonElement Json(string json) => JsonDocument.Parse(json).RootElement.Clone();
 
     private static PostNode Paragraph(string id, string text) =>
-        new(id, PostKind.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
+        new(id, PostKinds.Article, "block.paragraph", 1, Json($$"""{ "text": "{{text}}" }"""), Json("{}"), []);
 
     private static PostDocument Document(params PostNode[] children) =>
         new("post.news", 1, Json("""{ "headline": "Final day" }"""), Json("{}"), children);
@@ -49,7 +49,7 @@ public sealed class SharedContentsStore : IDisposable
         var b = ContentItem.Create("owner-1", "daily", "politics", publicId, Paragraph("p2", "Two"), "draft", Now);
         var items = new Dictionary<Guid, ContentItem> { [a.Id] = a, [b.Id] = b };
         var root = Document();
-        var post = Post.Create("owner-1", category, title, "", Now, PostKind.News, PostComposition.Working(root, [a.Id, b.Id], items),
+        var post = Post.Create("owner-1", category, title, "", Now, PostKinds.News, PostComposition.Working(root, [a.Id, b.Id], items),
             [new ContentRef(a.Id), new ContentRef(b.Id)], publicId);
         context.Contents.AddRange(a, b);
         context.Posts.Add(post);

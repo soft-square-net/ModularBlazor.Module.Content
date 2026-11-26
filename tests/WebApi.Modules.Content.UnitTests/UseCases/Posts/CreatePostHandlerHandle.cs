@@ -14,11 +14,11 @@ public class CreatePostHandlerHandle
 
     public CreatePostHandlerHandle()
     {
-        _handler = new CreatePostHandler(_categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details);
+        _handler = new CreatePostHandler(_categories, _fixture.Posts, _fixture.Store, _fixture.Split, _fixture.PostAccess, _fixture.Details, _fixture.Kinds);
         _categories.GetByIdAsync("politics", Arg.Any<CancellationToken>()).Returns(PostBuilder.Category());
     }
 
-    private static CreatePostCommand Command(string category = "politics") => new(category, "A title", "A body", PostKind.Article, null);
+    private static CreatePostCommand Command(string category = "politics") => new(category, "A title", "A body", PostKinds.Article, null);
 
     [Fact]
     public async Task ConflictsOnAnUnknownCategory()

@@ -7,6 +7,13 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
 {
     private const string Legacy = "legacy-";
 
+    /// <summary>A culture and its parents: ar-EG, then ar.</summary>
+    private static IEnumerable<string> CultureChain(string? culture)
+    {
+        for (var c = culture?.Trim(); !string.IsNullOrEmpty(c); c = c.LastIndexOf('-') is var dash and > 0 ? c[..dash] : null)
+            yield return c;
+    }
+
     public async ValueTask<Result<PublishedPost>> Handle(GetPublishedPostQuery query, CancellationToken ct)
     {
         var publicId = query.PublicId;
@@ -22,6 +29,7 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
         var chain = served.Select(language => translations.First(t => t.Language == language)).ToList();
         return new PublishedPost(post.Id, post.StablePublicId, PostDetails.Permalink(post.StablePublicId), post.PostKind, post.PressId,
             post.CategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion,
-            PostTranslationRules.Apply(document, chain), translations.Select(t => t.Language).ToList(), served);
+            PostTranslationRules.Apply(document, chain), translations.Select(t => t.Language).ToList(), served,
+            post.PublishedUrlPrefix, post.CanonicalPath([.. served, .. CultureChain(query.Culture)]));
     }
 }

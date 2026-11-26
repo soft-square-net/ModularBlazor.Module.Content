@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The migration harness: applies every Content migration, one set per engine, to a real PostgreSQL, SQL Server, MySQL
+    and Oracle database in Docker (Testcontainers), checks the data steps both ways, and checks that each engine's
+    model snapshot matches the model (no pending model changes). Without Docker every test is skipped.
+  -->
+
+  <ItemGroup>
+    <!-- The host-shared data layer (EF Core and the four engines' providers), which the module compiles against only. -->
+    <PackageReference Include="soft.square.net.WebApi.Data" Version="$(ModularBlazorPlatformVersion)" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.17.0" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.17.0" />
+    <PackageReference Include="Testcontainers.MySql" Version="4.17.0" />
+    <PackageReference Include="Testcontainers.Oracle" Version="4.17.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WebApi.Modules.Content.Infrastructure\WebApi.Modules.Content.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\WebApi.Modules.Content.UseCases\WebApi.Modules.Content.UseCases.csproj" />
+  </ItemGroup>
+
+</Project>
