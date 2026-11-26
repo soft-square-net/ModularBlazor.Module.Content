@@ -32,6 +32,12 @@ public interface IContentStore
     /// <summary>The posts that use this content, tracked with their contents.</summary>
     Task<IReadOnlyList<Post>> PostsUsingAsync(Guid contentId, CancellationToken ct);
 
+    /// <summary>The ids of the posts that use these contents, untracked (the live fan-out of a content's feed rows).</summary>
+    Task<IReadOnlyList<(Guid ContentId, int PostId)>> PostIdsUsingAsync(IReadOnlyCollection<Guid> contentIds, CancellationToken ct);
+
+    /// <summary>A post's press and category, untracked; null when there is no such post in the tenant.</summary>
+    Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct);
+
     /// <summary>Whether any post uses this content.</summary>
     Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct);
 

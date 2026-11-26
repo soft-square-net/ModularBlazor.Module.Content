@@ -32,6 +32,13 @@ public sealed class FakeContentStore : IContentStore
     public Task<IReadOnlyList<Post>> PostsUsingAsync(Guid contentId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<Post>>(Posts.Where(p => p.ContentLinks.Any(c => c.ContentId == contentId)).ToList());
 
+    public Task<IReadOnlyList<(Guid ContentId, int PostId)>> PostIdsUsingAsync(IReadOnlyCollection<Guid> contentIds, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<(Guid ContentId, int PostId)>>(
+            Posts.SelectMany(p => p.ContentLinks.Where(c => contentIds.Contains(c.ContentId)).Select(c => (c.ContentId, p.Id))).Distinct().ToList());
+
+    public Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct) =>
+        Task.FromResult(Posts.FirstOrDefault(p => p.Id == postId) is { } post ? ((string, string)?)(post.PressId, post.CategoryId) : null);
+
     public Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct) => Task.FromResult(Posts.Any(p => p.ContentLinks.Any(c => c.ContentId == contentId)));
 
     public Task<Pipeline?> PipelineAsync(CancellationToken ct) => Task.FromResult(Pipeline);

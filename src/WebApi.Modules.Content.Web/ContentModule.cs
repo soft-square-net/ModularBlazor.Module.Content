@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using soft.square.net.WebApi.Contracts;
 using soft.square.net.WebApi.Modules.Content.UseCases;
+using soft.square.net.WebApi.Modules.Content.UseCases.Live;
 using soft.square.net.WebApi.Modules.Content.Web.Configurations;
 
 namespace soft.square.net.WebApi.Modules.Content.Web;
@@ -20,7 +21,9 @@ public sealed class ContentModule : IRuntimeModule
     {
         Description = "Newsroom posts (article, news, video, reportage, and other post kinds), taxonomy, review and publishing workflow.",
         DefaultSettings = new Dictionary<string, string?> { ["Content:OwnerEditWindow"] = "1.00:00:00", ["Content:EventDelay"] = "00:00:02" },
-        Permissions = ContentPermissions.All
+        Permissions = ContentPermissions.All,
+        // content:post:{id}: a nudge for every new row of the post's feed (see PostLive).
+        LiveTopics = [PostLive.Topic]
     };
 
     public void ConfigureServices(IServiceCollection services, IConfiguration settings) => services.AddServiceConfigs(settings);

@@ -38,6 +38,20 @@ public sealed class ContentStore(ContentDbContext db) : IContentStore
     public async Task<IReadOnlyList<Post>> PostsUsingAsync(Guid contentId, CancellationToken ct) =>
         await db.Posts.Where(p => p.ContentLinks.Any(c => c.ContentId == contentId)).Include(p => p.ContentLinks).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<(Guid ContentId, int PostId)>> PostIdsUsingAsync(IReadOnlyCollection<Guid> contentIds, CancellationToken ct)
+    {
+        if (contentIds.Count == 0) return [];
+        var rows = await db.PostContents.Where(c => contentIds.Contains(c.ContentId)).Select(c => new { c.ContentId, c.PostId })
+            .Distinct().AsNoTracking().ToListAsync(ct);
+        return rows.Select(r => (r.ContentId, r.PostId)).ToList();
+    }
+
+    public async Task<(string PressId, string CategoryId)?> PostScopesAsync(int postId, CancellationToken ct)
+    {
+        var post = await db.Posts.Where(p => p.Id == postId).Select(p => new { p.PressId, p.CategoryId }).AsNoTracking().FirstOrDefaultAsync(ct);
+        return post is null ? null : (post.PressId, post.CategoryId);
+    }
+
     public Task<bool> IsUsedAsync(Guid contentId, CancellationToken ct) => db.PostContents.AnyAsync(c => c.ContentId == contentId, ct);
 
     public Task<Pipeline?> PipelineAsync(CancellationToken ct) => db.Pipelines.OrderBy(p => p.Id).FirstOrDefaultAsync(ct);

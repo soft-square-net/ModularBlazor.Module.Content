@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Unit tests of Core (aggregate rules) and UseCases (handlers, with NSubstitute for the repositories and the
-       platform's IAccessScopes / IGrantStore). No database, no host. -->
+  <!-- Unit tests of Core (aggregate rules), UseCases (handlers, with NSubstitute for the repositories and the
+       platform's IAccessScopes / IGrantStore) and the Web layer's declarations (manifest, lookups). No database, no host. -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WebApi.Modules.Content.Core\WebApi.Modules.Content.Core.csproj" />
     <ProjectReference Include="..\..\src\WebApi.Modules.Content.UseCases\WebApi.Modules.Content.UseCases.csproj" />
+    <!-- The lookups and the manifest (ContentLookups, ContentModule) are declared in the Web layer. -->
+    <ProjectReference Include="..\..\src\WebApi.Modules.Content.Web\WebApi.Modules.Content.Web.csproj" />
   </ItemGroup>
 
 </Project>
