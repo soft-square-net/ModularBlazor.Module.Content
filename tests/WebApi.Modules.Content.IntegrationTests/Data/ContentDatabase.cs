@@ -1,11 +1,15 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using soft.square.net.WebApi.Contracts.Live;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
+using soft.square.net.WebApi.Modules.Content.UseCases.Live;
 
 namespace soft.square.net.WebApi.Modules.Content.IntegrationTests.Data;
 
@@ -28,7 +32,8 @@ public sealed class ContentDatabase : IDisposable
         context.Database.EnsureCreated();
     }
 
-    public ContentDbContext For(string? tenantId)
+    /// <param name="live">Receives the live nudges of committed feed rows (the module's <c>LivePostPublisher</c>), when given.</param>
+    public ContentDbContext For(string? tenantId, ILiveNotifier? live = null)
     {
         ContentDbContext? context = null;
         var services = new ServiceCollection();
@@ -37,6 +42,9 @@ public sealed class ContentDatabase : IDisposable
         services.AddScoped<PostContents>();
         services.AddScoped<IDomainEventHandler<FeedEvent>, FeedWriter>();
         services.AddScoped<IDomainEventHandler<FeedEvent>, RecomposePostsOnContentChange>();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        services.AddScoped<IFeedCommitObserver, LivePostPublisher>();
+        if (live is not null) services.AddSingleton(live);
         var provider = services.BuildServiceProvider().CreateScope().ServiceProvider;
         var options = new DbContextOptionsBuilder<ContentDbContext>(_options).UseApplicationServiceProvider(provider).Options;
         return context = new ContentDbContext(options, new TestTenant(tenantId));

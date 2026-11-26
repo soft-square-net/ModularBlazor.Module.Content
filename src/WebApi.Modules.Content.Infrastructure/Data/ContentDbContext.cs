@@ -16,9 +16,34 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 /// <c>IEntityTypeConfiguration</c> classes in <c>Data/Config</c>; the migrations, one set per engine, are in
 /// <c>Data/Migrations/&lt;Provider&gt;</c>.
 /// </summary>
-public sealed class ContentDbContext(DbContextOptions<ContentDbContext> options, ITenantContext tenant) : TenantDbContext(options, tenant)
+public sealed class ContentDbContext : TenantDbContext
 {
+    private readonly FeedCommits _feed;
+
+    public ContentDbContext(DbContextOptions<ContentDbContext> options, ITenantContext tenant) : base(options, tenant)
+    {
+        _feed = new FeedCommits(this);
+        _feed.Follow();
+    }
+
     protected override string Schema => "content";
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.AddInterceptors(_feed); // commits and rollbacks of explicit transactions
+    }
+
+    /// <summary>
+    /// The platform's save (domain event handlers, then the write), then the live nudges for the feed rows it wrote, once
+    /// committed (<see cref="FeedCommits"/>). The nudges never fail the save.
+    /// </summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        await _feed.SavedAsync(acceptAllChangesOnSuccess, cancellationToken);
+        return result;
+    }
 
     public DbSet<Press> Presses => Set<Press>();
     public DbSet<Category> Categories => Set<Category>();
