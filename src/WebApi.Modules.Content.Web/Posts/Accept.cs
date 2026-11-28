@@ -10,7 +10,8 @@ public sealed class Accept : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/accept", HandleAsync)
-            .RequirePermission(ContentPermissions.Accept);
+            // Either gets in; the use case asks for the one Content:Newsroom:WorkflowOwnsAssignment calls for.
+            .RequirePermission(ContentPermissions.Accept, ContentPermissions.UnitAssign);
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, AcceptRequest r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new AcceptPostCommand(id, r.Version, r.ShiftId), ct)).ToOkResult();

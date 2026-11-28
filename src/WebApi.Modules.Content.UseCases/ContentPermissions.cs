@@ -24,7 +24,8 @@ public static class ContentPermissions
     public const string Pipeline = "content.pipeline";
     /// <summary>
     /// Put a post or a content in an Organization unit (the workflow's service client; granted to nobody else by default:
-    /// the moderator's choice reaches Content through the workflow).
+    /// the moderator's choice reaches Content through the workflow). While the workflow owns assignment
+    /// (<c>Content:Newsroom:WorkflowOwnsAssignment</c>), accept, assign, transfer and return need it too.
     /// </summary>
     public const string UnitAssign = "content.unit.assign";
 
@@ -41,6 +42,6 @@ public static class ContentPermissions
         new(Manage, "Manage presses and categories."),
         new(Events, "Read the change feed of posts and contents (workflow services), tenant-wide."),
         new(Pipeline, "Publish the content pipeline: stages and actions (workflow services, admins), tenant-wide."),
-        new(UnitAssign, "Put posts and contents in an Organization unit (the workflow's service client only).")
+        new(UnitAssign, "Put posts and contents in an Organization unit, and assign work while the workflow owns assignment (the workflow's service client only).")
     ];
 }

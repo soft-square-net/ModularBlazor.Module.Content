@@ -10,7 +10,8 @@ public sealed class Transfer : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/transfer", HandleAsync)
-            .RequirePermission(ContentPermissions.Transfer);
+            // Either gets in; the use case asks for the one Content:Newsroom:WorkflowOwnsAssignment calls for.
+            .RequirePermission(ContentPermissions.Transfer, ContentPermissions.UnitAssign);
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, TransferRequest r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new TransferPostCommand(id, r.Version, r.FromShift), ct)).ToOkResult();

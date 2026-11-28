@@ -118,15 +118,19 @@ public sealed class ActOnContentHandler(ContentChanges changes, ContentAccess ac
         }, ct);
 }
 
-/// <summary>Give a content to a section and/or a person (the shift manager's assign right in its category).</summary>
+/// <summary>
+/// Give a content to a section and/or a person (the shift manager's assign right in its category; only the workflow while it
+/// owns assignment, <see cref="AssignmentRights"/>).
+/// </summary>
 public sealed record AssignContentCommand(Guid Id, int Version, string? SectionId, string? AssigneeId) : ICommand<Result<ContentDetail>>;
 
-public sealed class AssignContentHandler(ContentChanges changes, ContentAccess access) : ICommandHandler<AssignContentCommand, Result<ContentDetail>>
+public sealed class AssignContentHandler(ContentChanges changes, ContentAccess access, AssignmentRights rights) : ICommandHandler<AssignContentCommand, Result<ContentDetail>>
 {
     public async ValueTask<Result<ContentDetail>> Handle(AssignContentCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async content =>
         {
-            var allowed = await access.Posts.RequireAsync(ContentPermissions.Assign, content.Scopes, "assign contents in this category", ct);
+            var allowed = await rights.RequireAsync(content.Scopes,
+                () => access.Posts.RequireAsync(ContentPermissions.Assign, content.Scopes, "assign contents in this category", ct), ct);
             if (!allowed.IsSuccess) return allowed;
             content.Assign(access.Me, command.SectionId, command.AssigneeId, access.Now);
             return Result.Success();

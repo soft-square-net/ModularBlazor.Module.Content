@@ -1,6 +1,6 @@
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts.Assign;
 
-public sealed class AssignPostHandler(PostChanges changes, PostAccess access, IGrantStore grants)
+public sealed class AssignPostHandler(PostChanges changes, PostAccess access, AssignmentRights rights, IGrantStore grants)
     : ICommandHandler<AssignPostCommand, Result<PostDetail>>
 {
     public async ValueTask<Result<PostDetail>> Handle(AssignPostCommand command, CancellationToken ct) =>
@@ -8,7 +8,8 @@ public sealed class AssignPostHandler(PostChanges changes, PostAccess access, IG
         {
             if (string.IsNullOrWhiteSpace(command.ShiftId))
                 return Result.Forbidden("Assignment must name the active shift that grants the editor access.");
-            var manager = await access.RequireShiftPermissionAsync(ContentPermissions.Assign, post.Scopes, command.ShiftId, ct);
+            var manager = await rights.RequireAsync(post.Scopes,
+                () => access.RequireShiftPermissionAsync(ContentPermissions.Assign, post.Scopes, command.ShiftId, ct), ct);
             if (!manager.IsSuccess) return manager;
             var targetIsEditor = (await grants.ListAsync(command.AssigneeId, $"shift:{command.ShiftId}", ct)).Any(g =>
                 g.Permission == ContentPermissions.Review && g.IsActiveAt(access.Now) && g.Covers(post.Scopes));
