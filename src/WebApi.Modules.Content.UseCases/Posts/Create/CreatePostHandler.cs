@@ -17,6 +17,17 @@ public sealed class CreatePostHandler(IReadRepository<Category> categories, IRep
 {
     public async ValueTask<Result<PostDetail>> Handle(CreatePostCommand command, CancellationToken ct)
     {
+        string? keyHash = null;
+        if (command.IdempotencyKey?.Trim() is { Length: > 0 } idempotencyKey)
+        {
+            if (idempotencyKey.Length > PostCreateKey.MaxLength)
+                return Result<PostDetail>.Invalid(new ValidationError(nameof(command.IdempotencyKey),
+                    $"An idempotency key has at most {PostCreateKey.MaxLength} characters."));
+            keyHash = PostCreateKey.Hash(idempotencyKey);
+            // First of all: a repeat gets its post even when a new one could not be made now.
+            if (await store.CreateKeyAsync(keyHash, ct) is { } made) return await MadeAsync(made, ct);
+        }
+
         var category = await categories.GetByIdAsync(command.CategoryId, ct);
         if (category is null) return Result<PostDetail>.Conflict($"Unknown category '{command.CategoryId}'.");
 
@@ -51,12 +62,23 @@ public sealed class CreatePostHandler(IReadRepository<Category> categories, IRep
         var (document, contents, created) = await split.CreateAsync(access.Me, category.PressId, category.Id, publicId, given, access.Now, ct);
         var post = Post.Create(access.Me, category, command.Title, command.Body, access.Now, kind.Value.Key, document, contents, publicId, others);
         foreach (var content in created) store.Add(content);
-        await store.InTransactionAsync(async () =>
+        async Task WriteAsync()
         {
             await posts.AddAsync(post, ct); // the post and its contents
             events.PostCreated(post);
+            if (keyHash is not null)
+                store.Add(new PostCreateKey(command.IdempotencyKey!.Trim(), access.Me, post.Id, access.Now));
             await store.SaveChangesAsync(ct);
-        }, ct);
+        }
+
+        if (keyHash is null) await store.InTransactionAsync(WriteAsync, ct);
+        else if (!await store.TryCreateOnceAsync(keyHash, WriteAsync, ct))
+            return await MadeAsync((await store.CreateKeyAsync(keyHash, ct))!.Value, ct);
         return await details.GetAsync(post.Id, ct);
     }
+
+    private async Task<Result<PostDetail>> MadeAsync((int PostId, string OwnerId) made, CancellationToken ct) =>
+        made.OwnerId == access.Me
+            ? await details.GetAsync(made.PostId, ct)
+            : Result<PostDetail>.Conflict("Another user already created a post with this idempotency key.");
 }

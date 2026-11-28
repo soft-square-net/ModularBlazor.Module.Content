@@ -27,7 +27,7 @@ public static class PostBuilder
     {
         var post = Submitted(now);
         post.Accept(Manager, Shift, now);
-        post.Assign(Manager, Reviewer, Shift, now);
+        post.Assign(Manager, Reviewer, now);
         return post;
     }
 

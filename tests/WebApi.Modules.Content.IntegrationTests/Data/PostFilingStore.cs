@@ -102,7 +102,7 @@ public sealed class PostFilingStore : IDisposable
         await SeedAsync();
         var access = Substitute.For<IAccessScopes>();
         access.ScopesAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns([scope]);
-        var posts = new PostAccess(access, Substitute.For<IGrantStore>(), TimeProvider.System);
+        var posts = new PostAccess(access, TimeProvider.System);
 
         var filter = await posts.ScopeFilterAsync(PostAccess.SeeingPermissions, Ct);
 

@@ -40,7 +40,7 @@ public class PostKindHandlers
         var post = WithId(Post.Create(PostBuilder.Owner, PostBuilder.Category(), "A title", "", now, kind), 7);
         post.Submit(PostBuilder.Owner, now);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, now);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, now);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, now);
         post.Approve(PostBuilder.Reviewer, now);
         _fixture.Stored(post);
         _fixture.SignIn(PostBuilder.Desk);

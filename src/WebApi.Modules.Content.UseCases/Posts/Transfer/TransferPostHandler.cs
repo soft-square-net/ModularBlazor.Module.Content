@@ -5,7 +5,7 @@ public sealed class TransferPostHandler(PostChanges changes, PostAccess access, 
     public async ValueTask<Result<PostDetail>> Handle(TransferPostCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async post =>
         {
-            var allowed = await rights.RequireAsync(post.Scopes,
+            var allowed = await rights.RequireAsync(post,
                 () => access.RequireAsync(ContentPermissions.Transfer, post.Scopes, "hand over work in this category now", ct), ct);
             if (!allowed.IsSuccess) return allowed;
             post.Transfer(access.Me, command.FromShift, access.Now);

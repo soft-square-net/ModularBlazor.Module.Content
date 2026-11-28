@@ -60,6 +60,32 @@ public sealed class FakeContentStore : IContentStore
     public Task<IReadOnlyList<FeedEntry>> FeedAsync(long after, DateTimeOffset notAfter, int take, int? postId, CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<FeedEntry>>(Feed.Take(take).ToList());
 
+    public Task<Post?> TrackedPostAsync(int postId, CancellationToken ct) => Task.FromResult(Posts.FirstOrDefault(p => p.Id == postId));
+
+    public Task<bool> IsWorkflowContentAsync(Guid contentId, string? originPostId, CancellationToken ct) =>
+        Task.FromResult(Posts.Any(p => p.IsWorkflowManaged
+            && (p.ContentLinks.Any(c => c.ContentId == contentId) || (originPostId != null && p.PublicId == originPostId))));
+
+    public List<PostCreateKey> Keys { get; } = [];
+    /// <summary>Another request that writes this key while the next create is writing it.</summary>
+    public PostCreateKey? RacingKey { get; set; }
+
+    public Task<(int PostId, string OwnerId)?> CreateKeyAsync(string keyHash, CancellationToken ct) =>
+        Task.FromResult<(int PostId, string OwnerId)?>(
+            Keys.FirstOrDefault(k => k.KeyHash == keyHash) is { } key ? (key.PostId, key.OwnerId) : null);
+
+    public void Add(PostCreateKey key) => Keys.Add(key);
+
+    public async Task<bool> TryCreateOnceAsync(string keyHash, Func<Task> work, CancellationToken ct)
+    {
+        var before = Keys.ToList();
+        await InTransactionAsync(work, ct);
+        if (RacingKey is not { } winner || winner.KeyHash != keyHash) return true;
+        Keys.Clear();
+        Keys.AddRange([.. before, winner]);
+        return false;
+    }
+
     public int Transactions { get; private set; }
 
     public async Task InTransactionAsync(Func<Task> work, CancellationToken ct)

@@ -28,6 +28,9 @@ public sealed class ContentOptions
     /// </summary>
     public int UnitCacheSeconds { get; set; } = 60;
 
+    /// <summary>How often the module's clock does its timed work (reviews to hand back). Default 15 seconds.</summary>
+    public TimeSpan ClockInterval { get; set; } = TimeSpan.FromSeconds(15);
+
     /// <summary>The newsroom workflow's settings (section <c>Content:Newsroom</c>).</summary>
     public NewsroomOptions Newsroom { get; set; } = new();
 }
@@ -36,9 +39,16 @@ public sealed class ContentOptions
 public sealed class NewsroomOptions
 {
     /// <summary>
-    /// Whether the newsroom workflow is the only one that assigns work. When true, a post's accept, assign, transfer and
-    /// return, and a content's assign, need <c>content.unit.assign</c> instead of the shift manager's (or the Desk's)
-    /// rights. Default false (the manual desk flow) until NewsRoom ships.
+    /// Whether the newsroom workflow is the only one that assigns the work of its posts (those with a NewsRoom project that is
+    /// not final). When true, accept, assign, transfer and return of such a post, and assigning its contents, need
+    /// <c>content.unit.assign</c> instead of the manual rights; other posts are still assigned by hand. Default false.
     /// </summary>
     public bool WorkflowOwnsAssignment { get; set; }
+
+    /// <summary>
+    /// How long the assigned reviewer of a post in review may be without the review right (their shift ended, say) before
+    /// the module hands the review back to the queue. The delay leaves a workflow, or a late check-in, time to act. Default
+    /// 10 minutes.
+    /// </summary>
+    public TimeSpan ReviewHandoverGrace { get; set; } = TimeSpan.FromMinutes(10);
 }

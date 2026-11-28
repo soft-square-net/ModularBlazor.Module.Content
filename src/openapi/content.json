@@ -1180,6 +1180,48 @@
         }
       }
     },
+    "/api/content/posts/{id}/unschedule": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "operationId": "Content_UnschedulePost",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VersionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/content/posts/{id}/publish": {
       "post": {
         "tags": [
@@ -1715,103 +1757,13 @@
           }
         }
       }
-    },
-    "/api/content/automation/accepted": {
-      "get": {
-        "tags": [
-          "Content"
-        ],
-        "summary": "Accepted works available for Elsa's durable assignment-delay workflow.",
-        "operationId": "Content_ListAcceptedForAutomation",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PostSummary"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/content/automation/accepted/{id}/assign": {
-      "post": {
-        "tags": [
-          "Content"
-        ],
-        "summary": "Assign the accepted work to an eligible editor on an active shift; concurrency conflicts preserve a manager's assignment.",
-        "operationId": "Content_AutoAssignPost",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PostDetail"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/content/automation/shifts/{shiftId}/handover": {
-      "post": {
-        "tags": [
-          "Content"
-        ],
-        "summary": "Return all unfinished review work from the outgoing shift to the queue; safe to repeat after recovery.",
-        "operationId": "Content_HandOverShiftWork",
-        "parameters": [
-          {
-            "name": "shiftId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            }
-          }
-        }
-      }
     }
   },
   "components": {
     "schemas": {
       "AcceptRequest": {
         "required": [
-          "version",
-          "shiftId"
+          "version"
         ],
         "type": "object",
         "properties": {
@@ -1820,15 +1772,17 @@
             "format": "int32"
           },
           "shiftId": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
       "Assignment": {
         "required": [
           "version",
-          "assigneeId",
-          "shiftId"
+          "assigneeId"
         ],
         "type": "object",
         "properties": {
@@ -1838,12 +1792,6 @@
           },
           "assigneeId": {
             "type": "string"
-          },
-          "shiftId": {
-            "type": [
-              "null",
-              "string"
-            ]
           }
         }
       },
@@ -2542,6 +2490,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "idempotencyKey": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2862,7 +2816,6 @@
           "acceptedAt",
           "acceptedShiftId",
           "assigneeId",
-          "assignedShiftId",
           "reviewerId",
           "scheduledFor",
           "scheduledBy",
@@ -2955,12 +2908,6 @@
             ]
           },
           "assigneeId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "assignedShiftId": {
             "type": [
               "null",
               "string"

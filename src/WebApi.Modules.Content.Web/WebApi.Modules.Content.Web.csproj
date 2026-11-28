@@ -4,7 +4,7 @@
   <!--
     Web: the module's entry assembly and composition root, the one the runtime loads. It holds the IRuntimeModule
     (ContentModule.cs), the service registration (Configurations/), and the HTTP endpoints, one file per endpoint
-    (Posts/, Presses/, Categories/, Automation/), mapped by ContentRoutes, the module's only ICarterModule (the runtime
+    (Posts/, Presses/, Categories/, Contents/), mapped by ContentRoutes, the module's only ICarterModule (the runtime
     maps the Carter modules of the entry assembly only).
     References UseCases and Infrastructure (to register them). Endpoints call use cases through Mediator, never the
     Infrastructure layer.

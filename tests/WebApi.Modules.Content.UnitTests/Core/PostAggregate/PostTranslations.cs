@@ -84,7 +84,7 @@ public class PostTranslations
         post.Translate(PostBuilder.Owner, "en", Arabic(("$root", "headline", "\"Last day\"")), Now);
         post.Submit(PostBuilder.Owner, Now);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, Now);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, Now);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, Now);
         post.Approve(PostBuilder.Reviewer, Now);
         post.Publish(PostBuilder.Desk, Now);
 

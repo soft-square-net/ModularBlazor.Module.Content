@@ -3,7 +3,7 @@ using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Accept;
 
 namespace soft.square.net.WebApi.Modules.Content.Web.Posts;
 
-/// <summary>POST /posts/{id}/accept: the shift manager accepts the submission.</summary>
+/// <summary>POST /posts/{id}/accept: accept the submission into the review queue.</summary>
 public sealed class Accept : IPostEndpoint
 {
     public static string Name => "AcceptPost";

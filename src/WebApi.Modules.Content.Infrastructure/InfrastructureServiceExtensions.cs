@@ -4,6 +4,8 @@ using soft.square.net.WebApi.Contracts.Messaging;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
+using soft.square.net.WebApi.Modules.Content.Infrastructure.Clock;
+using soft.square.net.WebApi.Modules.Content.UseCases.Newsroom;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Http;
 using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
@@ -32,6 +34,15 @@ public static class InfrastructureServiceExtensions
         services.AddIntegrationEvents<ContentDbContext>(o => o.Source = "content");
         services.AddIntegrationHandler<SectionMovedHandler>(SectionMovedHandler.Type);
         services.AddIntegrationHandler<OrgUnitEventsHandler>(OrgUnitEventsHandler.Pattern);
+        foreach (var type in NewsRoomProjectEventsHandler.Types)
+            services.AddIntegrationHandler<NewsRoomProjectEventsHandler>(type);
+
+        // The module's clock (a hosted service of this container). Its tenants are registered last: migrated and backfilled.
+        services.AddSingleton<ContentClockTenants>();
+        services.AddSingleton<ITenantInitializer>(sp => sp.GetRequiredService<ContentClockTenants>());
+        services.AddSingleton<IContentClockLock, TenantDatabaseClockLock>();
+        services.AddSingleton<ContentClock>();
+        services.AddHostedService(sp => sp.GetRequiredService<ContentClock>());
 
         // The post kinds, from DynamicFields over HTTP (cached per tenant in the module's own cache).
         services.AddHttpContextAccessor();

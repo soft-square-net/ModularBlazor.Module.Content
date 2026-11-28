@@ -3,7 +3,7 @@ using soft.square.net.WebApi.Modules.Content.UseCases.Posts.Assign;
 
 namespace soft.square.net.WebApi.Modules.Content.Web.Posts;
 
-/// <summary>POST /posts/{id}/assign: the shift manager assigns an editor on shift.</summary>
+/// <summary>POST /posts/{id}/assign: assign a reviewer who holds the review right now.</summary>
 public sealed class Assign : IPostEndpoint
 {
     public static string Name => "AssignPost";
@@ -14,5 +14,5 @@ public sealed class Assign : IPostEndpoint
             .RequirePermission(ContentPermissions.Assign, ContentPermissions.UnitAssign);
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, Assignment r, ISender sender, CancellationToken ct) =>
-        (await sender.Send(new AssignPostCommand(id, r.Version, r.AssigneeId, r.ShiftId), ct)).ToOkResult();
+        (await sender.Send(new AssignPostCommand(id, r.Version, r.AssigneeId), ct)).ToOkResult();
 }

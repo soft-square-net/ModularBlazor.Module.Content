@@ -199,7 +199,7 @@ public class PostRootHandlers
             PostDocument.NewRoot(PostKinds.News, 1, true, "A title")), 7);
         post.Submit(PostBuilder.Owner, now);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, now);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, now);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, now);
         post.Approve(PostBuilder.Reviewer, now);
         post.Publish(PostBuilder.Desk, now, urlPrefix: "news");
         _fixture.Reader.FirstOrDefaultAsync(Arg.Any<Ardalis.Specification.ISpecification<Post>>(), Arg.Any<CancellationToken>()).Returns(post);

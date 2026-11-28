@@ -2,7 +2,6 @@ using Carter;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using soft.square.net.WebApi.Modules.Content.Web.Extensions;
-using Automation = soft.square.net.WebApi.Modules.Content.Web.Automation;
 using Categories = soft.square.net.WebApi.Modules.Content.Web.Categories;
 using Contents = soft.square.net.WebApi.Modules.Content.Web.Contents;
 using Posts = soft.square.net.WebApi.Modules.Content.Web.Posts;
@@ -46,12 +45,6 @@ public sealed class ContentRoutes : ICarterModule
         Contents.GetPipeline.Map(content);
         Contents.PublishPipeline.Map(content);
         Contents.Events.Map(content);
-
-        // Its own group, mapped after the others, so the OpenAPI document lists these last.
-        var automation = app.MapGroup("").AddEndpointFilter<ContentProblemsFilter>();
-        Automation.ListAccepted.Map(automation);
-        Automation.AutoAssign.Map(automation);
-        Automation.HandOver.Map(automation);
     }
 
     private static void MapPosts(RouteGroupBuilder posts, string segment, bool documented)
@@ -67,6 +60,7 @@ public sealed class ContentRoutes : ICarterModule
         Post<Posts.Return>(posts, segment, documented);
         Post<Posts.Transfer>(posts, segment, documented);
         Post<Posts.Schedule>(posts, segment, documented);
+        Post<Posts.Unschedule>(posts, segment, documented);
         Post<Posts.Publish>(posts, segment, documented);
         Post<Posts.PublishDue>(posts, segment, documented);
         Post<Posts.Translate>(posts, segment, documented);

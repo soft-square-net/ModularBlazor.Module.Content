@@ -13,6 +13,7 @@ using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.ContentAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PipelineAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
+using soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Specifications;
 using soft.square.net.WebApi.Modules.Content.Core.PressAggregate;
 using soft.square.net.WebApi.Modules.Content.Infrastructure.Data;
 
@@ -33,6 +34,8 @@ namespace soft.square.net.WebApi.Modules.Content.MigrationTests;
 /// <item>the data step of <c>WorkItemStages</c>: down, a content in a stage that did not exist (in-progress) goes back to the
 /// old start stage (draft); up, the old keys become the work-item states, in the contents and in a published pipeline
 /// (rejected → returned in both);</item>
+/// <item>the newsroom cutover: its queries translate, a create key is written once, and the clock's try-lock is held by
+/// one at a time;</item>
 /// <item>the integration outbox and inbox tables exist (Content publishes and subscribes);</item>
 /// <item>every migration's Down runs (down to an empty schema), and every Up again.</item>
 /// </list>
@@ -71,6 +74,9 @@ public abstract class MigrationHarness
 
     /// <summary>A column or alias, quoted.</summary>
     protected abstract string Column(string name);
+
+    /// <summary>Whether the container's user may take the platform's advisory lock.</summary>
+    protected virtual bool CanLock => true;
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -222,6 +228,9 @@ public abstract class MigrationHarness
         await using (var context = Context(connection))
             (await context.Posts.AsNoTracking().SingleAsync(p => p.Title == "A long one", Ct)).Body.ShouldBe(longBody);
 
+        // 5c. The newsroom cutover: its queries on this engine, a create key written once, and the clock's lock.
+        await CutoverAsync(connection);
+
         // 6. Every Down, then every Up again.
         await using (var context = Context(connection))
         {
@@ -230,6 +239,50 @@ public abstract class MigrationHarness
             await context.Database.MigrateAsync(Ct);
             (await context.Database.GetPendingMigrationsAsync(Ct)).ShouldBeEmpty();
         }
+    }
+
+    private async Task CutoverAsync(string connection)
+    {
+        int postId;
+        string publicId;
+        await using (var context = Context(connection))
+        {
+            var post = await context.Posts.SingleAsync(p => p.Title == "A long one", Ct);
+            (postId, publicId) = (post.Id, post.PublicId);
+            post.FollowWorkflowProject(Guid.NewGuid(), ended: false).ShouldBeTrue();
+            post.Submit("owner-1", Now);
+            post.Assign("manager-1", "reviewer-1", Now);
+            post.CheckReviewer("content:clock", holdsReviewRight: false, Now, TimeSpan.FromMinutes(10));
+            context.Add(new PostCreateKey("newsroom:7", "owner-1", post.Id, Now));
+            await context.SaveChangesAsync(Ct);
+        }
+        await using (var context = Context(connection))
+        {
+            var store = new ContentStore(context);
+            (await store.CreateKeyAsync(PostCreateKey.Hash("newsroom:7"), Ct))!.Value.ShouldBe((postId, "owner-1"));
+            (await store.IsWorkflowContentAsync(Guid.NewGuid(), publicId, Ct)).ShouldBeTrue();
+            (await store.IsWorkflowContentAsync(Guid.NewGuid(), null, Ct)).ShouldBeFalse();
+            (await new EfRepository<Post>(context).ListAsync(new InReviewPostIdsSpec(0, 10), Ct)).ShouldBe([postId]);
+            var post = await context.Posts.AsNoTracking().SingleAsync(p => p.Id == postId, Ct);
+            post.ReviewerAwaySince.ShouldBe(Now);
+            post.IsWorkflowManaged.ShouldBeTrue();
+        }
+        await using (var context = Context(connection))
+        {
+            context.Add(new PostCreateKey("newsroom:7", "owner-2", postId, Now));
+            await Should.ThrowAsync<DbUpdateException>(() => context.SaveChangesAsync(Ct));
+        }
+
+        if (!CanLock) return;
+        var adapter = DatabaseProviderAdapter.For(Provider);
+        var locking = adapter.LockConnectionString(connection, connection);
+        await using (var held = await adapter.TryLockAsync(locking, "content_tests:content:clock", Ct))
+        {
+            held.ShouldNotBeNull();
+            (await adapter.TryLockAsync(locking, "content_tests:content:clock", Ct)).ShouldBeNull("another replica holds the tick");
+        }
+        await using var again = await adapter.TryLockAsync(locking, "content_tests:content:clock", Ct);
+        again.ShouldNotBeNull();
     }
 
     /// <summary>

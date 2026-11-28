@@ -52,7 +52,7 @@ public class SharedContentHandlers
     {
         post.Submit(PostBuilder.Owner, TestClock.Start);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, TestClock.Start);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, TestClock.Start);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, TestClock.Start);
     }
 
     private async Task<Post> ApprovedAsync()

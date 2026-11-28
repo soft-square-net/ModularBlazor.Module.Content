@@ -18,7 +18,7 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 public sealed record PostDetail(int Id, string PostKind, string PressId, string CategoryId, string Title, string Body, string OwnerId, PostState State,
     int Version, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? SubmittedAt, bool OwnerMayEdit, string? AcceptedBy,
     DateTimeOffset? AcceptedAt, string? AcceptedShiftId,
-    string? AssigneeId, string? AssignedShiftId, string? ReviewerId, DateTimeOffset? ScheduledFor, string? ScheduledBy,
+    string? AssigneeId, string? ReviewerId, DateTimeOffset? ScheduledFor, string? ScheduledBy,
     DateTimeOffset? PublishedAt, string? PublishedBy, string? PublishedTitle, string? PublishedBody,
     string? TransferredFromShift, IReadOnlyList<PostEventDto> History, string PublicId, string Permalink,
     string SchemaId, int SchemaVersion, PostDocument Document, IReadOnlyList<PostTranslation> Translations,

@@ -60,6 +60,7 @@ public sealed class ContentDbContext : TenantDbContext
     public DbSet<PostContent> PostContents => Set<PostContent>();
     public DbSet<PostSlug> PostSlugs => Set<PostSlug>();
     public DbSet<PostCategory> PostCategories => Set<PostCategory>();
+    public DbSet<PostCreateKey> PostCreateKeys => Set<PostCreateKey>();
     public DbSet<Pipeline> Pipelines => Set<Pipeline>();
     public DbSet<FeedEntry> Events => Set<FeedEntry>();
 

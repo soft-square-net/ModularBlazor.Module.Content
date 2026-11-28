@@ -96,12 +96,123 @@ public class PostWorkflow
     {
         var post = PostBuilder.InReview(Now);
 
-        post.Transfer(PostBuilder.Manager, null, Now);
+        post.Transfer(PostBuilder.Manager, PostBuilder.Shift, Now);
 
         post.State.ShouldBe(PostState.Accepted);
         post.AssigneeId.ShouldBeNull();
         post.TransferredFromShift.ShouldBe(PostBuilder.Shift);
     }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(" ", null)]
+    [InlineData(" shift-1 ", "shift-1")]
+    public void AcceptingNeedsNoShiftAndRecordsOneThatIsNamed(string? shift, string? recorded)
+    {
+        var post = PostBuilder.Submitted(Now);
+
+        post.Accept(PostBuilder.Manager, shift, Now);
+
+        post.AcceptedShiftId.ShouldBe(recorded);
+    }
+
+    private static readonly TimeSpan Grace = TimeSpan.FromMinutes(10);
+
+    [Fact]
+    public void AReviewerWhoLosesTheRightIsGivenTheGraceThenLosesTheReview()
+    {
+        var post = PostBuilder.InReview(Now);
+        var version = post.Version;
+
+        post.CheckReviewer("content:clock", holdsReviewRight: false, Now, Grace).ShouldBe(ReviewerCheck.Noted);
+        post.CheckReviewer("content:clock", false, Now.AddMinutes(9), Grace).ShouldBe(ReviewerCheck.Unchanged);
+        post.ReviewerAwaySince.ShouldBe(Now);
+        post.Version.ShouldBe(version); // noting it changes nothing a caller holds
+
+        post.CheckReviewer("content:clock", false, Now.AddMinutes(10), Grace).ShouldBe(ReviewerCheck.HandedOver);
+
+        post.State.ShouldBe(PostState.Accepted);
+        post.AssigneeId.ShouldBeNull();
+        post.ReviewerAwaySince.ShouldBeNull();
+        post.TransferredFromShift.ShouldBeNull();
+        post.Version.ShouldBe(version + 1);
+        var last = post.History.Last();
+        (last.Action, last.Actor).ShouldBe(("handed over", "content:clock"));
+    }
+
+    [Fact]
+    public void AReviewerWhoGetsTheRightBackKeepsTheReview()
+    {
+        var post = PostBuilder.InReview(Now);
+        post.CheckReviewer("content:clock", false, Now, Grace);
+
+        post.CheckReviewer("content:clock", true, Now.AddMinutes(5), Grace).ShouldBe(ReviewerCheck.Noted);
+        post.ReviewerAwaySince.ShouldBeNull();
+        post.CheckReviewer("content:clock", false, Now.AddMinutes(20), Grace).ShouldBe(ReviewerCheck.Noted); // the grace starts again
+        post.State.ShouldBe(PostState.InReview);
+    }
+
+    [Fact]
+    public void WithoutAGraceTheReviewIsHandedOverAtOnce() =>
+        PostBuilder.InReview(Now).CheckReviewer("content:clock", false, Now, TimeSpan.Zero).ShouldBe(ReviewerCheck.HandedOver);
+
+    [Fact]
+    public void OnlyAPostInReviewIsHandedOver() =>
+        PostBuilder.Approved(Now).CheckReviewer("content:clock", false, Now, TimeSpan.Zero).ShouldBe(ReviewerCheck.Unchanged);
+
+    [Fact]
+    public void LeavingReviewForgetsTheReviewersAbsence()
+    {
+        var post = PostBuilder.InReview(Now);
+        post.CheckReviewer("content:clock", false, Now, Grace);
+
+        post.Transfer(PostBuilder.Manager, null, Now);
+
+        post.ReviewerAwaySince.ShouldBeNull();
+    }
+
+    [Fact]
+    public void APostFollowsItsProjectUntilItIsFinal()
+    {
+        var post = PostBuilder.Submitted(Now);
+        var project = Guid.NewGuid();
+        var version = post.Version;
+
+        post.IsWorkflowManaged.ShouldBeFalse();
+        post.FollowWorkflowProject(project, ended: false).ShouldBeTrue();
+        post.IsWorkflowManaged.ShouldBeTrue();
+        post.FollowWorkflowProject(project, false).ShouldBeFalse();
+        post.FollowWorkflowProject(Guid.NewGuid(), ended: true).ShouldBeFalse(); // another project's end
+        post.FollowWorkflowProject(Guid.Empty, false).ShouldBeFalse();
+        post.IsWorkflowManaged.ShouldBeTrue();
+
+        post.FollowWorkflowProject(project, ended: true).ShouldBeTrue();
+        post.FollowWorkflowProject(project, ended: false).ShouldBeFalse(); // events arrive in any order
+        post.IsWorkflowManaged.ShouldBeFalse();
+        post.Version.ShouldBe(version);
+
+        post.FollowWorkflowProject(Guid.NewGuid(), false).ShouldBeTrue(); // a new project
+        post.IsWorkflowManaged.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void UnschedulingMakesThePostApprovedAgainAtItsNewVersion()
+    {
+        var post = PostBuilder.Approved(Now);
+        post.Schedule(PostBuilder.Desk, Now.AddHours(1), Now);
+
+        post.Unschedule(PostBuilder.Desk, Now);
+
+        post.State.ShouldBe(PostState.Approved);
+        post.ScheduledFor.ShouldBeNull();
+        post.ApprovedVersion.ShouldBe(post.Version);
+        post.History.Last().Action.ShouldBe("unscheduled");
+        post.PublishIfDue("workflow", Now.AddHours(2)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void OnlyAScheduledPostIsUnscheduled() =>
+        Should.Throw<DomainException>(() => PostBuilder.Approved(Now).Unschedule(PostBuilder.Desk, Now));
 
     [Fact]
     public void ADraftCannotBePublished() =>

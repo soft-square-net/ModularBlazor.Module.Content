@@ -42,6 +42,8 @@ public sealed class OracleMigrations : MigrationHarness
 {
     protected override DatabaseProvider Provider => DatabaseProvider.Oracle;
     protected override string OfflineConnection => "User Id=test;Password=test;Data Source=localhost:1521/FREEPDB1";
+    // DBMS_LOCK needs a grant the container's user lacks; the platform asks it of the server account (its README).
+    protected override bool CanLock => false;
     protected override IDatabaseContainer CreateContainer() => new OracleBuilder("gvenzl/oracle-free:23-slim").Build();
     protected override string Table(string name) => name.StartsWith("content_", StringComparison.Ordinal) ? $"\"{name}\"" : $"\"content_{name}\"";
     protected override string Column(string name) => $"\"{name}\"";

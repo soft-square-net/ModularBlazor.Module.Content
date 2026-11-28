@@ -55,8 +55,20 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     public DateTimeOffset? AcceptedAt { get; private set; }
     public string? AcceptedShiftId { get; private set; }
     public string? AssigneeId { get; private set; }
-    /// <summary>The shift the assignment was made in (informational; access itself comes from the assignee's grants).</summary>
-    public string? AssignedShiftId { get; private set; }
+    /// <summary>
+    /// Since when the assigned reviewer has been found without the review right on this Post (their shift is over, say);
+    /// null while they hold it. Written by the module's clock, which hands the review back once this is old enough.
+    /// </summary>
+    public DateTimeOffset? ReviewerAwaySince { get; private set; }
+    /// <summary>The NewsRoom project the Post is the draft of, as NewsRoom's events told it; null when it knows of none.</summary>
+    public Guid? WorkflowProjectId { get; private set; }
+    /// <summary>That project is final (killed or published): the newsroom workflow is done with the Post.</summary>
+    public bool WorkflowProjectEnded { get; private set; }
+    /// <summary>
+    /// The newsroom workflow is working on the Post: it has a NewsRoom project that is not final. While the workflow owns
+    /// assignment (<c>Content:Newsroom:WorkflowOwnsAssignment</c>), only these Posts are the workflow's alone to assign.
+    /// </summary>
+    public bool IsWorkflowManaged => WorkflowProjectId is not null && !WorkflowProjectEnded;
     public string? ReviewerId { get; private set; }
     public int? ApprovedVersion { get; private set; }
     public DateTimeOffset? ScheduledFor { get; private set; }
@@ -440,31 +452,31 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         });
     }
 
-    /// <summary>The shift manager accepts the submission: the owner is locked out from now on.</summary>
-    public void Accept(string actor, string shiftId, DateTimeOffset now)
+    /// <summary>The submission is accepted into the review queue: the owner is locked out from now on.</summary>
+    /// <param name="shiftId">The shift whose queue it joins, when the caller names one (recorded only).</param>
+    public void Accept(string actor, string? shiftId, DateTimeOffset now)
     {
-        if (string.IsNullOrWhiteSpace(shiftId)) throw new DomainException("Accepting a submission requires its active shift id.");
         Expect("accept", PostState.Submitted);
         Change(actor, "accepted", now, () =>
         {
             State = PostState.Accepted;
             AcceptedBy = actor;
             AcceptedAt = now;
-            AcceptedShiftId = shiftId;
+            AcceptedShiftId = string.IsNullOrWhiteSpace(shiftId) ? null : shiftId.Trim();
         });
     }
 
-    /// <summary>Assigns a reviewer (the manager, or the workflow after the manager's delay). Locks the owner out.</summary>
-    public void Assign(string actor, string assigneeId, string? shiftId, DateTimeOffset now)
+    /// <summary>Assigns a reviewer (a manager, or the workflow after the manager's delay). Locks the owner out.</summary>
+    public void Assign(string actor, string assigneeId, DateTimeOffset now)
     {
         Expect("assign", PostState.Submitted, PostState.Accepted);
         Change(actor, "assigned", now, () =>
         {
             State = PostState.InReview;
             AssigneeId = Require(assigneeId, "an assignee");
-            AssignedShiftId = shiftId;
+            ReviewerAwaySince = null;
             ReviewerId = null;
-        }, $"to {assigneeId}" + (shiftId is null ? "" : $" in shift {shiftId}"));
+        }, $"to {assigneeId}");
     }
 
     public void Approve(string actor, DateTimeOffset now)
@@ -474,6 +486,7 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         {
             State = PostState.Approved;
             ReviewerId = actor;
+            ReviewerAwaySince = null;
             ApprovedVersion = Version + 1; // the version this change produces
         });
     }
@@ -487,22 +500,66 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         {
             State = PostState.Returned;
             AssigneeId = null;
-            AssignedShiftId = null;
+            ReviewerAwaySince = null;
             ClearSchedule();
         }, reason);
     }
 
-    /// <summary>Handover: unfinished review work goes back to the queue for the next shift's manager.</summary>
-    public void Transfer(string actor, string? fromShift, DateTimeOffset now)
+    /// <summary>Handover: unfinished review work goes back to the queue for the next shift.</summary>
+    public void Transfer(string actor, string? fromShift, DateTimeOffset now) => BackToQueue(actor, "transferred", fromShift, now, fromShift);
+
+    private void BackToQueue(string actor, string action, string? fromShift, DateTimeOffset now, string? detail)
     {
         Expect("transfer", PostState.InReview);
-        Change(actor, "transferred", now, () =>
+        Change(actor, action, now, () =>
         {
-            TransferredFromShift = fromShift ?? AssignedShiftId;
+            TransferredFromShift = string.IsNullOrWhiteSpace(fromShift) ? null : fromShift;
             State = PostState.Accepted;
             AssigneeId = null;
-            AssignedShiftId = null;
-        }, fromShift);
+            ReviewerAwaySince = null;
+        }, detail);
+    }
+
+    /// <summary>
+    /// Notes whether the assigned reviewer of a Post in review holds the review right now, and hands the review back to the
+    /// queue once they have been without it for <paramref name="grace"/> (their shift ended and nobody moved the review).
+    /// Noting it is not a change of the Post (no version, no history); the handover is.
+    /// </summary>
+    public ReviewerCheck CheckReviewer(string actor, bool holdsReviewRight, DateTimeOffset now, TimeSpan grace)
+    {
+        if (State != PostState.InReview) return ReviewerCheck.Unchanged;
+        if (holdsReviewRight)
+        {
+            if (ReviewerAwaySince is null) return ReviewerCheck.Unchanged;
+            ReviewerAwaySince = null;
+            return ReviewerCheck.Noted;
+        }
+        var since = ReviewerAwaySince ?? now;
+        if (now - since >= grace)
+        {
+            var detail = $"{AssigneeId} no longer holds the review right";
+            BackToQueue(actor, "handed over", null, now, detail.Length > 500 ? detail[..500] : detail);
+            return ReviewerCheck.HandedOver;
+        }
+        if (ReviewerAwaySince is not null) return ReviewerCheck.Unchanged;
+        ReviewerAwaySince = now;
+        return ReviewerCheck.Noted;
+    }
+
+    /// <summary>
+    /// Follows the Post's NewsRoom project (<c>newsroom.project-*.v1</c>): <paramref name="ended"/> when it is final. Events
+    /// arrive in any order, so a final project stays final. Not a change of the Post (no version, no history). False when
+    /// nothing changes.
+    /// </summary>
+    public bool FollowWorkflowProject(Guid projectId, bool ended)
+    {
+        if (projectId == Guid.Empty) return false;
+        if (WorkflowProjectId == projectId && (WorkflowProjectEnded || !ended)) return false;
+        // The end of another project says nothing about the one the Post follows.
+        if (ended && IsWorkflowManaged && WorkflowProjectId != projectId) return false;
+        WorkflowProjectId = projectId;
+        WorkflowProjectEnded = ended;
+        return true;
     }
 
     /// <summary>
@@ -522,6 +579,21 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
             ScheduledBy = actor;
             ScheduledVersion = Version + 1;
         }, publishAt.ToString("O"));
+    }
+
+    /// <summary>
+    /// Takes a scheduled Post off the schedule (its project was killed, say): it is Approved again, at a new version, and is
+    /// not published until Desk publishes or schedules it again. A version published earlier stays live.
+    /// </summary>
+    public void Unschedule(string actor, DateTimeOffset now)
+    {
+        Expect("unschedule", PostState.Scheduled);
+        Change(actor, "unscheduled", now, () =>
+        {
+            ClearSchedule();
+            State = PostState.Approved;
+            ApprovedVersion = Version + 1; // the version this change produces
+        });
     }
 
     /// <summary>

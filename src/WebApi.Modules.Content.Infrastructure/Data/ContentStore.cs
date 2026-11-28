@@ -91,6 +91,37 @@ public sealed class ContentStore(ContentDbContext db) : IContentStore
         return await events.OrderBy(e => e.Id).Take(take).AsNoTracking().ToListAsync(ct);
     }
 
+    public Task<Post?> TrackedPostAsync(int postId, CancellationToken ct) => db.Posts.FirstOrDefaultAsync(p => p.Id == postId, ct);
+
+    public Task<bool> IsWorkflowContentAsync(Guid contentId, string? originPostId, CancellationToken ct) =>
+        db.Posts.AnyAsync(p => p.WorkflowProjectId != null && !p.WorkflowProjectEnded
+            && (p.ContentLinks.Any(c => c.ContentId == contentId) || (originPostId != null && p.PublicId == originPostId)), ct);
+
+    public async Task<(int PostId, string OwnerId)?> CreateKeyAsync(string keyHash, CancellationToken ct)
+    {
+        var found = await db.PostCreateKeys.AsNoTracking().Where(k => k.KeyHash == keyHash)
+            .Select(k => new { k.PostId, k.OwnerId }).FirstOrDefaultAsync(ct);
+        return found is null ? null : (found.PostId, found.OwnerId);
+    }
+
+    public void Add(PostCreateKey key) => db.PostCreateKeys.Add(key);
+
+    public async Task<bool> TryCreateOnceAsync(string keyHash, Func<Task> work, CancellationToken ct)
+    {
+        try
+        {
+            await InTransactionAsync(work, ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            // Rolled back. If the key is there now, another request won the race; otherwise the failure is a real one.
+            db.ChangeTracker.Clear();
+            if (await CreateKeyAsync(keyHash, ct) is null) throw;
+            return false;
+        }
+    }
+
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
     public async Task InTransactionAsync(Func<Task> work, CancellationToken ct)

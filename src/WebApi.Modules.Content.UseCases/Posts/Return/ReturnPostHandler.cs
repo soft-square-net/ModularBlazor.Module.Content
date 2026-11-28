@@ -5,7 +5,7 @@ public sealed class ReturnPostHandler(PostChanges changes, PostAccess access, As
     public async ValueTask<Result<PostDetail>> Handle(ReturnPostCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async post =>
         {
-            var allowed = await rights.RequireAsync(post.Scopes,
+            var allowed = await rights.RequireAsync(post,
                 () => access.RequireAsync(ContentPermissions.Return, post.Scopes, "send posts back in this category now", ct), ct);
             if (!allowed.IsSuccess) return allowed;
             post.Return(access.Me, command.Reason, access.Now);
