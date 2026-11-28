@@ -15,6 +15,14 @@ public sealed class FakePostKindCatalog : IPostKindCatalog
     public bool Down { get; set; }
     public int Calls { get; private set; }
 
+    /// <summary>The values each kind defines; a kind not listed has a headline and a summary.</summary>
+    public Dictionary<string, string[]> Values { get; } = [];
+
+    public Task<IReadOnlyList<string>> ValueKeysAsync(string key, int version, CancellationToken ct) =>
+        Down
+            ? throw new PostKindCatalogUnavailableException("DynamicFields answered 503 Service Unavailable")
+            : Task.FromResult<IReadOnlyList<string>>(Values.TryGetValue(key, out var keys) ? keys : ["headline", "description"]);
+
     public Task<IReadOnlyList<PostKindInfo>> ListAsync(CancellationToken ct)
     {
         Calls++;

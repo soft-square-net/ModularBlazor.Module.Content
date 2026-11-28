@@ -30,6 +30,6 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
         return new PublishedPost(post.Id, post.StablePublicId, PostDetails.Permalink(post.StablePublicId), post.PostKind, post.PressId,
             post.PrimaryCategoryId, post.PublishedTitle ?? post.Title, publishedAt, document.SchemaId, document.SchemaVersion,
             PostTranslationRules.Apply(document, chain), translations.Select(t => t.Language).ToList(), served,
-            post.PublishedUrlPrefix, post.CanonicalPath([.. served, .. CultureChain(query.Culture)]));
+            post.PublishedUrlPrefix, post.CanonicalPath([.. served, .. CultureChain(query.Culture)]), post.PublishedBody ?? "");
     }
 }

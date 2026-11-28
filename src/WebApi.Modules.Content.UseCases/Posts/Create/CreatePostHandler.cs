@@ -38,8 +38,17 @@ public sealed class CreatePostHandler(IReadRepository<Category> categories, IRep
         var kind = await kinds.ForNewPostAsync(command.PostKind, ct);
         if (!kind.IsSuccess) return kind.As<PostDetail>();
 
+        // Without a document of its own, the post gets a root of its kind (the title as its headline).
+        var given = command.Document;
+        if (given is null)
+        {
+            var root = await kinds.NewRootAsync(kind.Value, command.Title, ct);
+            if (!root.IsSuccess) return root.As<PostDetail>();
+            given = root.Value;
+        }
+
         var publicId = Post.NewPublicId();
-        var (document, contents, created) = await split.CreateAsync(access.Me, category.PressId, category.Id, publicId, command.Document, access.Now, ct);
+        var (document, contents, created) = await split.CreateAsync(access.Me, category.PressId, category.Id, publicId, given, access.Now, ct);
         var post = Post.Create(access.Me, category, command.Title, command.Body, access.Now, kind.Value.Key, document, contents, publicId, others);
         foreach (var content in created) store.Add(content);
         await store.InTransactionAsync(async () =>

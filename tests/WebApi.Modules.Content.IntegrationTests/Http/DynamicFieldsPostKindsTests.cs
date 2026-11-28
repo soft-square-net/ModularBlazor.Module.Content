@@ -38,7 +38,7 @@ public sealed class DynamicFieldsPostKindsTests
 
         var kinds = await Catalog().ListAsync(Ct);
 
-        kinds.ShouldBe([new PostKindInfo("post.news", "News", "news", "NewsArticle"), new PostKindInfo("post.blog", "Blog", "ar/blog", "BlogPosting")]);
+        kinds.ShouldBe([new PostKindInfo("post.news", "News", "news", "NewsArticle", 2), new PostKindInfo("post.blog", "Blog", "ar/blog", "BlogPosting", 1)]);
         var request = _handler.Requests.ShouldHaveSingleItem();
         request.Uri.ShouldBe("http://gateway:5080/api/dynamicfields/catalog/root-post-fields");
         request.Authorization.ShouldBe("Bearer abc");
@@ -78,6 +78,29 @@ public sealed class DynamicFieldsPostKindsTests
         _handler.Fail = true;
 
         await Should.ThrowAsync<PostKindCatalogUnavailableException>(() => Catalog().ListAsync(Ct));
+    }
+
+    [Fact]
+    public async Task ReadsTheValueKeysOfAFieldVersionAndCachesThem()
+    {
+        _handler.Respond(HttpStatusCode.OK, """{ "field": { "key": "post.news", "version": 2, "properties": [ { "key": "headline" }, { "key": "dateline" } ] } }""");
+
+        var first = await Catalog().ValueKeysAsync("post.news", 2, Ct);
+        await Catalog().ValueKeysAsync("post.news", 2, Ct);
+
+        first.ShouldBe(["headline", "dateline"]);
+        var request = _handler.Requests.ShouldHaveSingleItem();
+        request.Uri.ShouldBe("http://gateway:5080/api/dynamicfields/fields/post.news/versions/2");
+        request.Authorization.ShouldBe("Bearer abc");
+        request.Tenant.ShouldBe("acme");
+    }
+
+    [Fact]
+    public async Task AFieldVersionWithoutValuesIsUnavailable()
+    {
+        _handler.Respond(HttpStatusCode.OK, "{}");
+
+        await Should.ThrowAsync<PostKindCatalogUnavailableException>(() => Catalog().ValueKeysAsync("post.news", 2, Ct));
     }
 
     private sealed class Handler : HttpMessageHandler
