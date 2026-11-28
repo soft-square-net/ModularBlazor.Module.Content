@@ -23,6 +23,7 @@ namespace soft.square.net.WebApi.Modules.Content.MigrationTests;
 /// <list type="number">
 /// <item>its model snapshot matches the model (no pending model changes; no database needed);</item>
 /// <item>every migration applies to an empty database, in order;</item>
+/// <item>a post with an empty body saves and reads back with an empty body (Oracle stores '' as NULL);</item>
 /// <item>the data step of <c>PostKindsAsFieldKeys</c> works both ways: down to the enum names, up to the field keys,
 /// in the kind columns and in the stored JSON;</item>
 /// <item>the data step of <c>UnitsAndCategories</c>: posts and contents keep their unit, a post its categories; down and
@@ -101,6 +102,7 @@ public abstract class MigrationHarness
         await using (var context = Context(connection))
         {
             var post = await context.Posts.AsNoTracking().SingleAsync(Ct);
+            post.Body.ShouldBe("");
             post.Categories.ShouldBe(["politics", "economy"]);
             post.UnitId.ShouldBe(Desk);
             post.UnitPath.ShouldBe(DeskPath);
@@ -219,8 +221,8 @@ public abstract class MigrationHarness
     }
 
     /// <summary>
-    /// A post of kind post.video whose document has one photo-story node, and a content of that node (one row each); the post is
-    /// in two categories of its press and in a unit, the content in the same unit.
+    /// A post of kind post.video with an empty body, whose document has one photo-story node, and a content of that node
+    /// (one row each); the post is in two categories of its press and in a unit, the content in the same unit.
     /// </summary>
     private async Task SeedAsync(string connection)
     {
@@ -232,8 +234,8 @@ public abstract class MigrationHarness
         var content = ContentItem.Create("owner-1", "daily", "politics", null, node, "in-progress", Now);
         content.ChangeUnit("workflow", Desk, DeskPath, Now);
         var document = new PostDocument("post.video", 1, Json("""{ "headline": "A title" }"""), Json("{}"), [node]);
-        // A body: Oracle stores '' as NULL, and Body is required (a known gap, see the C1 handover).
-        var post = Post.Create("owner-1", category, "A title", "A body", Now, PostKinds.Video, document, otherCategories: [economy]);
+        // An empty body, as a document-only post has (Oracle stores it as NULL).
+        var post = Post.Create("owner-1", category, "A title", "", Now, PostKinds.Video, document, otherCategories: [economy]);
         post.ChangeUnit("workflow", Desk, DeskPath, Now);
         context.AddRange(press, category, economy, content, post);
         await context.SaveChangesAsync(Ct);

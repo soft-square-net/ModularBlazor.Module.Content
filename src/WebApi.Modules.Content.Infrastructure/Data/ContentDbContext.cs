@@ -1,5 +1,6 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using soft.square.net.WebApi.Contracts.Tenancy;
 using soft.square.net.WebApi.Data;
 using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
@@ -74,6 +75,11 @@ public sealed class ContentDbContext : TenantDbContext
             modelBuilder.Entity<ContentItem>().Property(c => c.ValuesJson).HasColumnType("NCLOB");
             modelBuilder.Entity<ContentRevision>().Property(r => r.ValuesJson).HasColumnType("NCLOB");
             modelBuilder.Entity<Pipeline>().Property(p => p.DefinitionJson).HasColumnType("NCLOB");
+
+            // Oracle stores '' as NULL, and a post's body may be empty (a document-only post): the column takes NULL, and EF
+            // reads it into the post's nullable backing field, so Body reads back as "". The model's other required strings
+            // are never empty (the domain refuses blank values).
+            modelBuilder.Entity<Post>().Property(a => a.Body).IsRequired(false);
         }
 
         if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
@@ -81,7 +87,7 @@ public sealed class ContentDbContext : TenantDbContext
             // The integration tests' engine cannot compare DateTimeOffset values (the feed's hold-back): store them as ticks.
             foreach (var property in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetProperties())
                          .Where(p => p.ClrType == typeof(DateTimeOffset) || p.ClrType == typeof(DateTimeOffset?)))
-                property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.DateTimeOffsetToBinaryConverter());
+                property.SetValueConverter(new DateTimeOffsetToBinaryConverter());
         }
     }
 }

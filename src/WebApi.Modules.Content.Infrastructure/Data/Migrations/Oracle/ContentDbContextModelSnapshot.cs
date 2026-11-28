@@ -448,7 +448,6 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasColumnType("NVARCHAR2(128)");
 
                     b.Property<string>("Body")
-                        .IsRequired()
                         .HasColumnType("NVARCHAR2(2000)");
 
                     b.Property<bool>("ContentsSplit")
