@@ -19,7 +19,6 @@ namespace soft.square.net.WebApi.Modules.Content.UnitTests.UseCases.Posts;
 public sealed class PostFixture
 {
     public IAccessScopes Access { get; } = Substitute.For<IAccessScopes>();
-    public IGrantStore Grants { get; } = Substitute.For<IGrantStore>();
     public IRepository<Post> Posts { get; } = Substitute.For<IRepository<Post>>();
     public IReadRepository<Post> Reader { get; } = Substitute.For<IReadRepository<Post>>();
     public IReadRepository<ContentItem> ContentReader { get; } = Substitute.For<IReadRepository<ContentItem>>();
@@ -50,7 +49,7 @@ public sealed class PostFixture
     public PostFixture(string userId)
     {
         Access.UserId.Returns(userId);
-        PostAccess = new PostAccess(Access, Grants, Clock);
+        PostAccess = new PostAccess(Access, Clock);
         Kinds = new PostKindRules(KindCatalog, Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance);
         Details = new PostDetails(Reader, ContentReader, PostAccess, Options, Kinds);
         Changes = new PostChanges(Posts, Details);

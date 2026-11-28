@@ -21,7 +21,7 @@ public class PostWithContents
             contents: [new ContentRef(a.Id), new ContentRef(b.Id, Required: false)]), 7);
         post.Submit(PostBuilder.Owner, Now);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, Now);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, Now);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, Now);
         post.Approve(PostBuilder.Reviewer, Now);
         return (post, a, b);
     }

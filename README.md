@@ -239,35 +239,54 @@ field the tenant publishes. Its static URL prefix comes from that field.
   (with the unit's path in the envelope) remaps every content of that section to the unit and clears the section. The
   column stays until Shifts removes sections (S4).
 
-Content subscribes to `shifts.section-moved.v1` and `org.unit-*.v1` (the manifest's `Subscriptions`). The events it
+Content subscribes to `shifts.section-moved.v1`, `org.unit-*.v1` and NewsRoom's project events (see "Who assigns work";
+the manifest's `Subscriptions`). The events it
 publishes are listed under "Work items, checks and events".
 
 ## Who assigns work
 
 Moving work between people is five steps: a post's **accept**, **assign**, **transfer** and **return**, and a content's
 **assign** (`POST /contents/{id}/assign`). The setting `Content:Newsroom:WorkflowOwnsAssignment` (default **false**) says
-who may take them.
+who may take them. With `true` it matters whether the newsroom workflow is working on the post: it is, from the first
+NewsRoom event that names the post with a project, until that project is `Killed` or `Published`
+(`newsroom.project-approved.v1`, `newsroom.project-reapproved.v1`, `newsroom.project-state-changed.v1`). A content is
+the workflow's while such a post uses it, or when it was made for one.
 
-| Step | `false` (default): the manual desk | `true`: the workflow only |
+| Step | By hand (`false`, or `true` for other work) | `true`, the workflow's work |
 | --- | --- | --- |
-| `POST /posts/{id}/accept` | `content.accept` in the named active shift | `content.unit.assign` |
-| `POST /posts/{id}/assign` | `content.assign` in the named active shift | `content.unit.assign` |
+| `POST /posts/{id}/accept` | `content.accept` | `content.unit.assign` |
+| `POST /posts/{id}/assign` | `content.assign` | `content.unit.assign` |
 | `POST /posts/{id}/transfer` | `content.transfer` | `content.unit.assign` |
 | `POST /posts/{id}/return` | `content.return` (shift Manager, Desk) | `content.unit.assign` |
 | `POST /contents/{id}/assign` | `content.assign` | `content.unit.assign` |
 
-- Every right is checked on the post's or the content's scopes (see "Categories and units").
-- With `true`, `content.unit.assign` **replaces** the right of the left column: ordinary users get 403, the shift manager
-  and the Desk too, and the workflow's service client needs no shift.
-- The other rules don't change. Accept still records a shift id, assign still names a shift on which the assignee holds
-  `content.review` for the post (otherwise 409), and each step still needs the post in a state it can start from.
-- Keep it `false` until the NewsRoom workflow runs: with `true` and no workflow, nobody can assign work. The pages
-  still show the buttons; the API decides.
-- It does not change these:
-  - `POST /automation/auto-assign/{id}` still needs `content.assign` and then takes the assign step, so with `true` its
-    caller needs `content.unit.assign` too.
-  - `POST /automation/handover` keeps its own rule, tenant-wide `content.transfer`.
-  - `POST /contents` may still name a first assignee, with the author right.
+- Every right is checked on the post's or the content's scopes (see "Categories and units"). Rights from a shift count
+  only while the shift runs.
+- On the workflow's work, `content.unit.assign` **replaces** the right of the middle column: ordinary users get 403, the
+  shift manager and the Desk too, and the workflow's service client needs no shift.
+- With `true`, `content.unit.assign` also takes the steps on other work (the workflow may act before NewsRoom's event has
+  arrived). With `false` it takes none.
+- Assign needs an assignee who holds `content.review` for the post **now**, through a grant (otherwise 409); a platform
+  role is not seen for another user. Accept may name a shift id (`shiftId`, optional), which is only recorded.
+- With `true`, `POST /contents` with a first assignee (`assigneeId`) needs `content.unit.assign` (a section alone does not).
+- Posts of projects approved before this version are not known until NewsRoom sends another event for them.
+- Keep it `false` until the NewsRoom workflow runs: with `true` and no workflow, nobody can assign the work of its
+  projects. The pages still show the buttons; the API decides.
+
+**Handover at shift end.** The module's clock (every `Content:ClockInterval`, 15 seconds; one replica at a time per
+tenant, under a database try-lock) checks every post in review. When its reviewer no longer holds `content.review` for it
+(their shift ended, say) for `Content:Newsroom:ReviewHandoverGrace` (10 minutes), the post goes back to the queue
+(Accepted, no assignee; history action `handed over`, by `content:clock`). The delay leaves a workflow with a desk review
+in progress, or a late check-in, time to act first. On Oracle the platform's server account needs `EXECUTE` on
+`DBMS_LOCK`, as for migrations.
+
+**Unschedule.** `POST /posts/{id}/unschedule { version }` (`content.publish`) takes a scheduled post off the schedule: it
+is Approved again at the new version, and nothing publishes it until the Desk publishes or schedules it. A version
+published earlier stays live. 409 when the post is not scheduled.
+
+**Repeating a create.** `POST /posts` takes an optional `idempotencyKey` (at most 200 characters), unique in the tenant.
+A repeat by the same user answers with the post made first (the rest of the request is not compared); the key from
+another user is a 409.
 
 ## Work items, checks and events
 

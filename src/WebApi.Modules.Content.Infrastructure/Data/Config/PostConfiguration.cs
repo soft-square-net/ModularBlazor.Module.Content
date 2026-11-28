@@ -35,9 +35,9 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         post.Property(a => a.Version).IsConcurrencyToken();
         foreach (var user in new[] { nameof(Post.AcceptedBy), nameof(Post.AssigneeId), nameof(Post.ReviewerId), nameof(Post.ScheduledBy), nameof(Post.PublishedBy) })
             post.Property(user).HasMaxLength(DataSchemaConstants.UserIdLength);
-        post.Property(a => a.AssignedShiftId).HasMaxLength(DataSchemaConstants.SlugLength);
         post.Property(a => a.TransferredFromShift).HasMaxLength(DataSchemaConstants.SlugLength);
         post.Ignore(a => a.Scopes);
+        post.Ignore(a => a.IsWorkflowManaged);
         post.Ignore(a => a.Categories);
         post.HasIndex(a => new { a.State, a.PrimaryCategoryId });
         post.HasIndex(a => a.UnitId);
@@ -56,6 +56,19 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
         post.Ignore(a => a.Contents);
         post.Ignore(a => a.Root);
         // Rows that predate the split get false from the migration (the backfill then splits them); new rows are written true.
+    }
+}
+
+/// <summary>The idempotency keys posts were created with: one per key hash in the tenant.</summary>
+public sealed class PostCreateKeyConfiguration : IEntityTypeConfiguration<PostCreateKey>
+{
+    public void Configure(EntityTypeBuilder<PostCreateKey> key)
+    {
+        key.ToTable("post_create_keys");
+        key.Property(k => k.KeyHash).HasMaxLength(PostCreateKey.HashLength);
+        key.Property(k => k.OwnerId).HasMaxLength(DataSchemaConstants.UserIdLength);
+        key.HasIndex(k => k.KeyHash).IsUnique();
+        key.HasOne<Post>().WithMany().HasForeignKey(k => k.PostId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

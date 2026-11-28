@@ -31,7 +31,7 @@ src/
     ContentModule.cs                      IRuntimeModule: manifest, permissions, ConfigureServices
     Configurations/                       ServiceConfigs (all registrations), MediatorConfig
     ContentRoutes.cs                      the only ICarterModule: the route table
-    Posts/  Presses/  Categories/  Automation/   one endpoint class per route (REPR)
+    Posts/  Presses/  Categories/  Contents/     one endpoint class per route (REPR)
     Extensions/                           ResultExtensions (Result -> HTTP), ContentProblemsFilter
 tests/
   WebApi.Modules.Content.UnitTests/       Core rules; UseCases handlers with NSubstitute

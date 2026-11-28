@@ -5,8 +5,8 @@ public sealed class AcceptPostHandler(PostChanges changes, PostAccess access, As
     public async ValueTask<Result<PostDetail>> Handle(AcceptPostCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async post =>
         {
-            var manager = await rights.RequireAsync(post.Scopes,
-                () => access.RequireShiftPermissionAsync(ContentPermissions.Accept, post.Scopes, command.ShiftId, ct), ct);
+            var manager = await rights.RequireAsync(post,
+                () => access.RequireAsync(ContentPermissions.Accept, post.Scopes, "accept submissions in this category now", ct), ct);
             if (!manager.IsSuccess) return manager;
             post.Accept(access.Me, command.ShiftId, access.Now);
             return Result.Success();

@@ -31,12 +31,13 @@ public sealed class ContentChanges(IContentStore store, ContentAccess access, Co
 /// Make a content in the library (the caller needs the author right in its category), in the pipeline's start stage.
 /// With <see cref="PostId"/> (and its <see cref="PostVersion"/>) it is attached to that post at once, at <see cref="Index"/>
 /// (the end by default), by someone who may edit the post now; its category is then the post's unless given.
+/// While the workflow owns assignment, naming a first <see cref="AssigneeId"/> needs <c>content.unit.assign</c>.
 /// </summary>
 public sealed record CreateContentCommand(string? CategoryId, PostNode Values, string? SectionId = null, string? AssigneeId = null,
     int? PostId = null, int? PostVersion = null, int? Index = null, bool Required = true) : ICommand<Result<ContentDetail>>;
 
 public sealed class CreateContentHandler(IReadRepository<Category> categories, IRepository<Post> posts, IContentStore store,
-    ContentAccess access, ContentPipelines pipelines, PostContentEditing editing, ContentDetails details)
+    ContentAccess access, ContentPipelines pipelines, PostContentEditing editing, ContentDetails details, AssignmentRights rights)
     : ICommandHandler<CreateContentCommand, Result<ContentDetail>>
 {
     public async ValueTask<Result<ContentDetail>> Handle(CreateContentCommand command, CancellationToken ct)
@@ -55,6 +56,13 @@ public sealed class CreateContentHandler(IReadRepository<Category> categories, I
         var author = await access.Posts.RequireAsync(ContentPermissions.Author, [AccessScope.Press(category.PressId), AccessScope.Category(category.Id)],
             "write in this category", ct);
         if (!author.IsSuccess) return author.As<ContentDetail>();
+        if (rights.WorkflowOwns && !string.IsNullOrWhiteSpace(command.AssigneeId))
+        {
+            var assigner = await access.Posts.RequireAsync(ContentPermissions.UnitAssign,
+                post?.Scopes ?? [AccessScope.Press(category.PressId), AccessScope.Category(category.Id)],
+                "name an assignee for a new content while the newsroom workflow owns assignment (create it, then assign it)", ct);
+            if (!assigner.IsSuccess) return assigner.As<ContentDetail>();
+        }
 
         var pipeline = await pipelines.CurrentAsync(ct);
         var content = ContentItem.Create(access.Me, category.PressId, category.Id, post?.StablePublicId, command.Values with { NodeId = "" },
@@ -119,17 +127,19 @@ public sealed class ActOnContentHandler(ContentChanges changes, ContentAccess ac
 }
 
 /// <summary>
-/// Give a content to a section and/or a person (the shift manager's assign right in its category; only the workflow while it
-/// owns assignment, <see cref="AssignmentRights"/>).
+/// Give a content to a section and/or a person (the assign right in its category; only the workflow for the contents of its
+/// posts while it owns assignment, <see cref="AssignmentRights"/>).
 /// </summary>
 public sealed record AssignContentCommand(Guid Id, int Version, string? SectionId, string? AssigneeId) : ICommand<Result<ContentDetail>>;
 
-public sealed class AssignContentHandler(ContentChanges changes, ContentAccess access, AssignmentRights rights) : ICommandHandler<AssignContentCommand, Result<ContentDetail>>
+public sealed class AssignContentHandler(ContentChanges changes, ContentAccess access, AssignmentRights rights, IContentStore store)
+    : ICommandHandler<AssignContentCommand, Result<ContentDetail>>
 {
     public async ValueTask<Result<ContentDetail>> Handle(AssignContentCommand command, CancellationToken ct) =>
         await changes.ChangeAsync(command.Id, command.Version, async content =>
         {
-            var allowed = await rights.RequireAsync(content.Scopes,
+            var managed = rights.WorkflowOwns && await store.IsWorkflowContentAsync(content.Id, content.OriginPostId, ct);
+            var allowed = await rights.RequireAsync(managed, content.Scopes,
                 () => access.Posts.RequireAsync(ContentPermissions.Assign, content.Scopes, "assign contents in this category", ct), ct);
             if (!allowed.IsSuccess) return allowed;
             content.Assign(access.Me, command.SectionId, command.AssigneeId, access.Now);

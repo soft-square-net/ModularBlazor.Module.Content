@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Unit tests of Core (aggregate rules), UseCases (handlers, with NSubstitute for the repositories and the
-       platform's IAccessScopes / IGrantStore) and the Web layer's declarations (manifest, lookups). No database, no host. -->
+       platform's IAccessScopes) and the Web layer's declarations (manifest, lookups). No database, no host. -->
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\WebApi.Modules.Content.Core\WebApi.Modules.Content.Core.csproj" />

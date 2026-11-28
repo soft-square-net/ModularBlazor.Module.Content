@@ -64,6 +64,10 @@
         {
           <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="SubmitAsync" disabled="@Busy">@L["Submit for review"]</button>
         }
+        @if (_post.State is PostState.Submitted)
+        {
+          <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="AcceptAsync" disabled="@Busy">@L["Accept"]</button>
+        }
         @if (_post.State is PostState.InReview)
         {
           <button type="button" class="mud-button-root mud-button-filled mud-button-primary mud-button-medium" @onclick="ApproveAsync" disabled="@Busy">@L["Approve"]</button>
@@ -74,16 +78,6 @@
         }
       </div>
 
-      @if (_post.State is PostState.Submitted)
-      {
-        <form class="ct-inline-form" @onsubmit="AcceptAsync" @onsubmit:preventDefault>
-          <div class="mud-input-control ct-inline">
-            <label class="mud-input-label" for="ct-shift">@L["Shift"]</label>
-            <div class="mud-input-wrapper"><input id="ct-shift" class="mud-input-slot" @bind="_shiftId" required placeholder="@L["shift id"]" /></div>
-          </div>
-          <button type="submit" class="mud-button-root mud-button-outlined mud-button-primary mud-button-medium" disabled="@Busy">@L["Accept into shift"]</button>
-        </form>
-      }
       @if (_post.State is PostState.Accepted or PostState.InReview)
       {
         <form class="ct-inline-form" @onsubmit="AssignAsync" @onsubmit:preventDefault>
@@ -277,7 +271,6 @@
   private PostDetail? _post;
   private string _title = "";
   private string? _body;
-  private string? _shiftId;
   private string? _assigneeId;
   private string? _returnReason;
   private DateTime? _publishAt;
@@ -384,7 +377,6 @@
     _post = post;
     _title = post.Title;
     _body = post.Body;
-    _shiftId ??= post.AcceptedShiftId;
     _primary = post.CategoryId;
     _others = [.. post.Categories.Where(c => c != post.CategoryId)];
     _publishAt ??= post.ScheduledFor?.LocalDateTime ?? DateTime.Now.AddHours(1);
@@ -407,7 +399,7 @@
 
   private Task SubmitAsync() => StepAsync((c, v) => c.SubmitPostAsync(Id, new VersionRequest { Version = v }), "Submitted for review.");
 
-  private Task AcceptAsync() => StepAsync((c, v) => c.AcceptPostAsync(Id, new AcceptRequest { Version = v, ShiftId = (_shiftId ?? "").Trim() }), "Accepted into the shift's queue.");
+  private Task AcceptAsync() => StepAsync((c, v) => c.AcceptPostAsync(Id, new AcceptRequest { Version = v }), "Accepted into the review queue.");
 
   private Task AssignAsync() => StepAsync((c, v) => c.AssignPostAsync(Id, new Assignment { Version = v, AssigneeId = (_assigneeId ?? "").Trim() }), "Assigned.");
 

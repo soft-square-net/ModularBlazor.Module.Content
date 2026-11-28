@@ -53,7 +53,7 @@ public sealed class PostDetails(IReadRepository<Post> reader, IReadRepository<Co
     private PostDetail ToDetail(Post a, IReadOnlyDictionary<Guid, ContentItem> items, string? urlPrefix) => new(a.Id, a.PostKind, a.PressId, a.PrimaryCategoryId, a.Title, a.Body, a.OwnerId, a.State, a.Version,
         a.CreatedAt, a.UpdatedAt, a.SubmittedAt, a.OwnerMayEdit(access.Now, options.Value.OwnerEditWindow), a.AcceptedBy,
         a.AcceptedAt, a.AcceptedShiftId, a.AssigneeId,
-        a.AssignedShiftId, a.ReviewerId, a.ScheduledFor, a.ScheduledBy, a.PublishedAt, a.PublishedBy,
+        a.ReviewerId, a.ScheduledFor, a.ScheduledBy, a.PublishedAt, a.PublishedBy,
         a.PublishedTitle, a.PublishedTitle is null ? a.PublishedBody : a.PublishedBody ?? "", a.TransferredFromShift, // Oracle: '' is NULL
         a.History.OrderBy(e => e.At).ThenBy(e => e.Id).Select(e => new PostEventDto(e.At, e.Actor, e.Action, e.State, e.Detail)).ToArray(),
         a.StablePublicId, Permalink(a.StablePublicId), a.SchemaId, a.SchemaVersion,

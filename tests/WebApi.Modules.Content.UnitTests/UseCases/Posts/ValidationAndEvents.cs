@@ -59,7 +59,7 @@ public class ValidationAndEvents
     {
         post.Submit(PostBuilder.Owner, TestClock.Start);
         post.Accept(PostBuilder.Manager, PostBuilder.Shift, TestClock.Start);
-        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, PostBuilder.Shift, TestClock.Start);
+        post.Assign(PostBuilder.Manager, PostBuilder.Reviewer, TestClock.Start);
         _fixture.SignIn(PostBuilder.Reviewer);
         _fixture.Allow(ContentPermissions.Review);
         return new ApprovePostHandler(_fixture.Changes, _fixture.PostAccess, _fixture.PostContents, _fixture.Pipelines, _fixture.Validation)

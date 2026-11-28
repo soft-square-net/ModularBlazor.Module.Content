@@ -2,7 +2,7 @@ using soft.square.net.WebApi.Modules.Content.UseCases.Posts.PublishDue;
 
 namespace soft.square.net.WebApi.Modules.Content.Web.Posts;
 
-/// <summary>POST /posts/publish-due: publish every scheduled Post that is due (the workflow module calls it).</summary>
+/// <summary>POST /posts/publish-due: publish every scheduled Post that is due.</summary>
 public sealed class PublishDue : IPostEndpoint
 {
     public static string Name => "PublishDuePosts";

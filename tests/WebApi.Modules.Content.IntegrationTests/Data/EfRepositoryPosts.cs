@@ -66,7 +66,7 @@ public sealed class EfRepositoryPosts : IDisposable
         mine!.Accept("manager-1", "shift-1", Now);
         await new EfRepository<Post>(first).UpdateAsync(mine, Ct);
 
-        theirs!.Assign("manager-2", "reviewer-1", "shift-1", Now);
+        theirs!.Assign("manager-2", "reviewer-1", Now);
         await Should.ThrowAsync<DbUpdateConcurrencyException>(() => new EfRepository<Post>(second).UpdateAsync(theirs, Ct));
     }
 
@@ -81,7 +81,7 @@ public sealed class EfRepositoryPosts : IDisposable
 
         var post = await posts.FirstOrDefaultAsync(new PostByIdSpec(saved.Id), Ct);
         post!.Accept("manager-1", "shift-1", Now);
-        post.Assign("manager-1", "reviewer-1", "shift-1", Now);
+        post.Assign("manager-1", "reviewer-1", Now);
         post.Approve("reviewer-1", Now);
         post.Publish("desk-1", Now);
         await posts.UpdateAsync(post, Ct);

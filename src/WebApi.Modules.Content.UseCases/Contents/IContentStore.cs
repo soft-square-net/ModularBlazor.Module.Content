@@ -62,6 +62,23 @@ public interface IContentStore
     /// </summary>
     Task<IReadOnlyList<FeedEntry>> FeedAsync(long after, DateTimeOffset notAfter, int take, int? postId, CancellationToken ct);
 
+    /// <summary>One post, tracked (for a change that is saved by someone else, such as the inbox); null when unknown.</summary>
+    Task<Post?> TrackedPostAsync(int postId, CancellationToken ct);
+
+    /// <summary>Whether a post the newsroom workflow is working on uses this content, or the content was made for it.</summary>
+    Task<bool> IsWorkflowContentAsync(Guid contentId, string? originPostId, CancellationToken ct);
+
+    /// <summary>The post created with this idempotency key (<see cref="PostCreateKey.Hash"/>) and its owner, if any.</summary>
+    Task<(int PostId, string OwnerId)?> CreateKeyAsync(string keyHash, CancellationToken ct);
+
+    void Add(PostCreateKey key);
+
+    /// <summary>
+    /// <see cref="InTransactionAsync"/> for work that writes the key with this hash: false when another request wrote the
+    /// same key first (nothing of this work is kept then).
+    /// </summary>
+    Task<bool> TryCreateOnceAsync(string keyHash, Func<Task> work, CancellationToken ct);
+
     Task SaveChangesAsync(CancellationToken ct);
 
     /// <summary>

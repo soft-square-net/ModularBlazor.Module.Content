@@ -426,10 +426,6 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.Property<int?>("ApprovedVersion")
                         .HasColumnType("int");
 
-                    b.Property<string>("AssignedShiftId")
-                        .HasMaxLength(64)
-                        .HasColumnType("varchar(64)");
-
                     b.Property<string>("AssigneeId")
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
@@ -503,6 +499,9 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasMaxLength(200)
                         .HasColumnType("varchar(200)");
 
+                    b.Property<DateTime?>("ReviewerAwaySince")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<string>("ReviewerId")
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
@@ -570,6 +569,12 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("int");
+
+                    b.Property<bool>("WorkflowProjectEnded")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<Guid?>("WorkflowProjectId")
+                        .HasColumnType("char(36)");
 
                     b.HasKey("Id");
 
@@ -642,6 +647,45 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .IsUnique();
 
                     b.ToTable("content_post_contents", (string)null);
+                });
+
+            modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostCreateKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("KeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("OwnerId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.Property<int>("PostId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KeyHash")
+                        .IsUnique();
+
+                    b.HasIndex("PostId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("content_post_create_keys", (string)null);
                 });
 
             modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostEvent", b =>
@@ -765,6 +809,15 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                 {
                     b.HasOne("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Post", null)
                         .WithMany("ContentLinks")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.PostCreateKey", b =>
+                {
+                    b.HasOne("soft.square.net.WebApi.Modules.Content.Core.PostAggregate.Post", null)
+                        .WithMany()
                         .HasForeignKey("PostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

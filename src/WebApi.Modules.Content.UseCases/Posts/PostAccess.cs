@@ -9,7 +9,7 @@ namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 /// the unit's ancestors), using the
 /// caller's grants as they are right now: shift grants count only while the shift runs, so access ends on the clock.
 /// </summary>
-public sealed class PostAccess(IAccessScopes access, IGrantStore grants, TimeProvider clock)
+public sealed class PostAccess(IAccessScopes access, TimeProvider clock)
 {
     public DateTimeOffset Now => clock.GetUtcNow();
 
@@ -48,18 +48,13 @@ public sealed class PostAccess(IAccessScopes access, IGrantStore grants, TimePro
         [ContentPermissions.Accept, ContentPermissions.Assign, ContentPermissions.Return, ContentPermissions.Publish, ContentPermissions.Editor,
          ContentPermissions.Manage, ContentPermissions.UnitAssign];
 
-    /// <summary>For the automation endpoints: the permission must cover the whole tenant.</summary>
+    /// <summary>Whether another user holds the permission on these scopes now (grants only, no platform role).</summary>
+    public Task<bool> UserHasAsync(string userId, string permission, IReadOnlyCollection<string> scopes, CancellationToken ct) =>
+        access.UserHasPermissionAsync(userId, permission, scopes, ct);
+
+    /// <summary>For work on the whole tenant: the permission must cover all of it.</summary>
     public async Task<Result> RequireTenantWideAsync(string permission, string message, CancellationToken ct) =>
         (await access.ScopesAsync(permission, ct)).Contains(AccessScope.Tenant) ? Result.Success() : Result.Forbidden(message);
-
-    public async Task<Result> RequireShiftPermissionAsync(string permission, IReadOnlyCollection<string> scopes, string shiftId, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(shiftId)) return Result.Forbidden("An active shift is required for this action.");
-        var now = Now;
-        var valid = (await grants.ListAsync(Me, $"shift:{shiftId}", ct)).Any(g =>
-            g.Permission == permission && g.IsActiveAt(now) && g.Covers(scopes));
-        return valid ? Result.Success() : Result.Forbidden($"You do not hold {permission} in active shift '{shiftId}' for this category.");
-    }
 
     /// <summary>Desk on shift; publishing your own or self-reviewed Post also needs the standing editor right on its category.</summary>
     public async Task<Result> RequirePublisherAsync(Post post, CancellationToken ct)

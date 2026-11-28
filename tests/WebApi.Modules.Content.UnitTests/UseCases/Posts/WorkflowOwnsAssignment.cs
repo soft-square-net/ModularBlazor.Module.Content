@@ -23,7 +23,8 @@ namespace soft.square.net.WebApi.Modules.Content.UnitTests.UseCases.Posts;
 
 /// <summary>
 /// <c>Content:Newsroom:WorkflowOwnsAssignment</c>: off (the default), a post's accept, assign, transfer and return, and a
-/// content's assign, keep the manual desk rules; on, only <c>content.unit.assign</c> (the workflow) may take them.
+/// content's assign, keep the manual desk rules; on, those of a post the workflow is working on need
+/// <c>content.unit.assign</c> (the workflow), and other work is taken by hand or by the workflow.
 /// </summary>
 public class WorkflowOwnsAssignment
 {
@@ -39,19 +40,17 @@ public class WorkflowOwnsAssignment
         new(_fixture.PostAccess, Microsoft.Extensions.Options.Options.Create(
             new ContentOptions { Newsroom = new() { WorkflowOwnsAssignment = workflowOwns } }));
 
-    /// <summary>Grants of a running shift: what the shifts module writes from the rota.</summary>
-    private void OnShift(string userId, params string[] permissions) =>
-        _fixture.Grants.ListAsync(userId, $"shift:{PostBuilder.Shift}", Arg.Any<CancellationToken>())
-            .Returns([.. permissions.Select(p => new AccessGrant(Guid.NewGuid(), "acme", userId, p, "category:politics",
-                _fixture.Clock.Now.AddHours(-1), _fixture.Clock.Now.AddHours(1), $"shift:{PostBuilder.Shift}", _fixture.Clock.Now, null))]);
+    /// <summary>The reviewer holds the review right now (an editor on a running shift).</summary>
+    private void MayReview(string userId) =>
+        _fixture.Access.UserHasPermissionAsync(userId, ContentPermissions.Review, Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>())
+            .Returns(true);
 
-    /// <summary>The manual desk: the shift manager holds every right the five steps ask for today.</summary>
+    /// <summary>The manual desk: a manager who holds every right the five steps ask for.</summary>
     private void SignInTheManager()
     {
         foreach (var permission in new[] { ContentPermissions.Accept, ContentPermissions.Assign, ContentPermissions.Transfer, ContentPermissions.Return })
             _fixture.Allow(permission);
-        OnShift(PostBuilder.Manager, ContentPermissions.Accept, ContentPermissions.Assign);
-        OnShift(PostBuilder.Reviewer, ContentPermissions.Review);
+        MayReview(PostBuilder.Reviewer);
     }
 
     /// <summary>The workflow's service client: <c>content.unit.assign</c> and nothing else, on no shift.</summary>
@@ -59,20 +58,28 @@ public class WorkflowOwnsAssignment
     {
         _fixture.SignIn(Workflow);
         _fixture.Allow(ContentPermissions.UnitAssign);
-        OnShift(PostBuilder.Reviewer, ContentPermissions.Review);
+        MayReview(PostBuilder.Reviewer);
     }
 
     /// <summary>Takes the step on something in the state it starts from; also says whether anything changed.</summary>
-    private async Task<(ResultStatus Status, string Errors, bool Changed)> TakeAsync(Step step, bool workflowOwns)
+    private async Task<(ResultStatus Status, string Errors, bool Changed)> TakeAsync(Step step, bool workflowOwns,
+        bool project = true, bool projectEnded = false)
     {
         var now = _fixture.Clock.Now;
         var rights = Rights(workflowOwns);
         if (step == Step.AssignContent)
         {
-            var content = Item();
+            var draft = Content.Core.PostAggregate.Post.Create(PostBuilder.Owner, PostBuilder.Category(), "A draft", "", now);
+            var content = Item(origin: draft.PublicId); // made for the draft
             _fixture.Store.Contents.Add(content);
+            if (project)
+            {
+                draft.FollowWorkflowProject(Guid.NewGuid(), ended: false);
+                if (projectEnded) draft.FollowWorkflowProject(draft.WorkflowProjectId!.Value, ended: true);
+                _fixture.Store.Posts.Add(draft);
+            }
             var before = content.Version;
-            var assigned = await new AssignContentHandler(_fixture.ContentChanges, _fixture.ContentAccess, rights)
+            var assigned = await new AssignContentHandler(_fixture.ContentChanges, _fixture.ContentAccess, rights, _fixture.Store)
                 .Handle(new AssignContentCommand(content.Id, before, null, "writer-2"), Ct);
             return (assigned.Status, string.Join(" ", assigned.Errors), content.Version != before);
         }
@@ -85,14 +92,16 @@ public class WorkflowOwnsAssignment
             _ => PostBuilder.Submitted(now)
         };
         WithId(post, 7);
+        if (project) post.FollowWorkflowProject(Guid.NewGuid(), ended: false);
+        if (projectEnded) post.FollowWorkflowProject(post.WorkflowProjectId!.Value, ended: true);
         _fixture.Stored(post);
         var version = post.Version;
         var result = step switch
         {
             Step.Accept => await new AcceptPostHandler(_fixture.Changes, _fixture.PostAccess, rights)
                 .Handle(new AcceptPostCommand(7, version, PostBuilder.Shift), Ct),
-            Step.Assign => await new AssignPostHandler(_fixture.Changes, _fixture.PostAccess, rights, _fixture.Grants)
-                .Handle(new AssignPostCommand(7, version, PostBuilder.Reviewer, PostBuilder.Shift), Ct),
+            Step.Assign => await new AssignPostHandler(_fixture.Changes, _fixture.PostAccess, rights)
+                .Handle(new AssignPostCommand(7, version, PostBuilder.Reviewer), Ct),
             Step.Transfer => await new TransferPostHandler(_fixture.Changes, _fixture.PostAccess, rights)
                 .Handle(new TransferPostCommand(7, version, PostBuilder.Shift), Ct),
             _ => await new ReturnPostHandler(_fixture.Changes, _fixture.PostAccess, rights)
@@ -167,18 +176,77 @@ public class WorkflowOwnsAssignment
     }
 
     [Fact]
-    public async Task OnTheWorkflowStillAssignsOnlyAnEditorOnShift()
+    public async Task OnTheWorkflowStillAssignsOnlyAReviewerWhoMayReview()
     {
         SignInTheWorkflow();
         var post = PostBuilder.Submitted(_fixture.Clock.Now);
         WithId(post, 7);
         _fixture.Stored(post);
 
-        var result = await new AssignPostHandler(_fixture.Changes, _fixture.PostAccess, Rights(true), _fixture.Grants)
-            .Handle(new AssignPostCommand(7, post.Version, "someone-off-shift", PostBuilder.Shift), Ct);
+        var result = await new AssignPostHandler(_fixture.Changes, _fixture.PostAccess, Rights(true))
+            .Handle(new AssignPostCommand(7, post.Version, "someone-off-shift"), Ct);
 
         result.Status.ShouldBe(ResultStatus.Conflict);
         post.AssigneeId.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(Step.Accept)]
+    [InlineData(Step.Assign)]
+    [InlineData(Step.Transfer)]
+    [InlineData(Step.Return)]
+    [InlineData(Step.AssignContent)]
+    public async Task OnWithoutAProjectTheDeskStillTakesTheStepByHand(Step step)
+    {
+        SignInTheManager();
+
+        var (status, errors, changed) = await TakeAsync(step, workflowOwns: true, project: false);
+
+        status.ShouldBe(ResultStatus.Ok, errors);
+        changed.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(Step.Accept)]
+    [InlineData(Step.Assign)]
+    [InlineData(Step.Transfer)]
+    [InlineData(Step.Return)]
+    [InlineData(Step.AssignContent)]
+    public async Task OnOnceTheProjectEndedTheDeskTakesTheStepAgain(Step step)
+    {
+        SignInTheManager();
+
+        var (status, errors, _) = await TakeAsync(step, workflowOwns: true, projectEnded: true);
+
+        status.ShouldBe(ResultStatus.Ok, errors);
+    }
+
+    /// <summary>The workflow may act before NewsRoom's event has reached this module.</summary>
+    [Theory]
+    [InlineData(Step.Accept)]
+    [InlineData(Step.Assign)]
+    [InlineData(Step.Transfer)]
+    [InlineData(Step.Return)]
+    [InlineData(Step.AssignContent)]
+    public async Task OnWithoutAProjectTheWorkflowMayStillTakeTheStep(Step step)
+    {
+        SignInTheWorkflow();
+
+        var (status, errors, _) = await TakeAsync(step, workflowOwns: true, project: false);
+
+        status.ShouldBe(ResultStatus.Ok, errors);
+    }
+
+    [Theory]
+    [InlineData(Step.Accept)]
+    [InlineData(Step.Assign)]
+    [InlineData(Step.Return)]
+    public async Task WithoutAnyRightNobodyTakesTheStep(Step step)
+    {
+        var (status, _, changed) = await TakeAsync(step, workflowOwns: true, project: false);
+
+        status.ShouldBe(ResultStatus.Forbidden);
+        changed.ShouldBeFalse();
     }
 
     [Fact]
