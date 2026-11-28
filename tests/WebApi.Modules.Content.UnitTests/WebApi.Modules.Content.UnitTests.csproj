@@ -10,4 +10,9 @@
     <ProjectReference Include="..\..\src\WebApi.Modules.Content.Web\WebApi.Modules.Content.Web.csproj" />
   </ItemGroup>
 
+  <!-- The client module's plain naming functions, compiled in: the module itself is a Blazor client assembly. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Module.Content\ContentNames.cs" Link="Client\ContentNames.cs" />
+  </ItemGroup>
+
 </Project>

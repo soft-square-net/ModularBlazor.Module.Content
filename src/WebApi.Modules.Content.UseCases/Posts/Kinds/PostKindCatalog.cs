@@ -4,7 +4,8 @@ using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Posts.Kinds;
 
 /// <summary>A post kind as DynamicFields publishes it: a root post field with its static URL prefix.</summary>
-public sealed record PostKindInfo(string Key, string Title, string UrlPrefix, string? SchemaType);
+/// <param name="Version">The field's newest published version: the one a new post's root is made against.</param>
+public sealed record PostKindInfo(string Key, string Title, string UrlPrefix, string? SchemaType, int Version = 1);
 
 /// <summary>
 /// The current tenant's post kinds: DynamicFields' published root post fields
@@ -15,6 +16,12 @@ public interface IPostKindCatalog
 {
     /// <summary>The kinds; throws <see cref="PostKindCatalogUnavailableException"/> when DynamicFields cannot answer.</summary>
     Task<IReadOnlyList<PostKindInfo>> ListAsync(CancellationToken ct);
+
+    /// <summary>
+    /// The keys of the values a published field version defines (<c>GET /api/dynamicfields/fields/{key}/versions/{version}</c>);
+    /// throws <see cref="PostKindCatalogUnavailableException"/> when DynamicFields cannot answer.
+    /// </summary>
+    Task<IReadOnlyList<string>> ValueKeysAsync(string key, int version, CancellationToken ct);
 }
 
 /// <summary>DynamicFields could not be reached, or refused the call: the kinds are unknown for now.</summary>
@@ -46,6 +53,39 @@ public sealed class PostKindRules(IPostKindCatalog catalog, ILoggerFactory logge
             ? info
             : Result<PostKindInfo>.Invalid(new ValidationError(nameof(Post.PostKind),
                 $"'{key}' is not a published DynamicFields root post field. Publish that field (with its URL prefix) first, or choose another kind."));
+    }
+
+    /// <summary>
+    /// The root of a new post of this kind: made against the field's published version, with the title as its headline when
+    /// the field has one. Unavailable when DynamicFields cannot answer.
+    /// </summary>
+    public async Task<Result<PostDocument>> NewRootAsync(PostKindInfo kind, string title, CancellationToken ct)
+    {
+        try
+        {
+            var keys = await catalog.ValueKeysAsync(kind.Key, kind.Version, ct);
+            return PostDocument.NewRoot(kind.Key, kind.Version, keys.Contains(PostDocument.HeadlineKey, StringComparer.Ordinal), title);
+        }
+        catch (PostKindCatalogUnavailableException e)
+        {
+            _log.LogWarning(e, "The post kind {Kind} could not be read from DynamicFields: {Reason}", kind.Key, e.Message);
+            return Result<PostDocument>.Unavailable($"The post kinds could not be read from DynamicFields ({e.Message}); try again later.");
+        }
+    }
+
+    /// <summary>Every published kind, by title; Unavailable when DynamicFields cannot answer.</summary>
+    public async Task<Result<IReadOnlyList<PostKindInfo>>> ListAsync(CancellationToken ct)
+    {
+        try
+        {
+            return Result<IReadOnlyList<PostKindInfo>>.Success(
+                [.. (await catalog.ListAsync(ct)).OrderBy(k => k.Title, StringComparer.OrdinalIgnoreCase)]);
+        }
+        catch (PostKindCatalogUnavailableException e)
+        {
+            _log.LogWarning(e, "The post kinds could not be read from DynamicFields: {Reason}", e.Message);
+            return Result<IReadOnlyList<PostKindInfo>>.Unavailable($"The post kinds could not be read from DynamicFields ({e.Message}); try again later.");
+        }
     }
 
     /// <summary>The kind a post is published (or scheduled) under: refused while DynamicFields has no published root field for it.</summary>

@@ -122,6 +122,30 @@
         }
       }
     },
+    "/api/content/kinds": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "The post kinds: the published DynamicFields root post fields.",
+        "operationId": "Content_ListPostKinds",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PostKindInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/content/public/{publicId}": {
       "get": {
         "tags": [
@@ -1582,6 +1606,49 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UnitAssignment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/content/posts/{id}/root": {
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Set the values of the post's kind (the root of its document); also gives a legacy post its kind's root.",
+        "operationId": "Content_SetPostRoot",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PostRootEdit"
               }
             }
           },
@@ -3117,6 +3184,37 @@
           }
         }
       },
+      "PostKindInfo": {
+        "required": [
+          "key",
+          "title",
+          "urlPrefix",
+          "schemaType"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "urlPrefix": {
+            "type": "string"
+          },
+          "schemaType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1
+          }
+        }
+      },
       "PostNode": {
         "required": [
           "nodeId",
@@ -3154,6 +3252,28 @@
           "postKind": {
             "type": "string"
           }
+        }
+      },
+      "PostRootEdit": {
+        "required": [
+          "version",
+          "fieldVersion",
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fieldVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "content": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "style": { }
         }
       },
       "PostSlugsEdit": {
@@ -3479,6 +3599,10 @@
               "null",
               "string"
             ]
+          },
+          "body": {
+            "type": "string",
+            "default": ""
           }
         }
       },

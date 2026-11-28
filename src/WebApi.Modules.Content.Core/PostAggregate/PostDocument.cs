@@ -33,6 +33,27 @@ public sealed record PostDocument(
     /// <summary>The schema of a document made from a legacy title and body (not a DynamicFields field).</summary>
     public const string LegacySchemaId = "legacy.basic";
 
+    /// <summary>The root value a post's title goes to, in the kinds that have it.</summary>
+    public const string HeadlineKey = "headline";
+
+    /// <summary>
+    /// The root of a new post of <paramref name="kind"/> (a DynamicFields root post field, at its published version): its
+    /// headline is the title when the field has one (<paramref name="hasHeadline"/>). The other values are left to be filled
+    /// in; DynamicFields' checks say which of them the post still needs.
+    /// </summary>
+    public static PostDocument NewRoot(string kind, int version, bool hasHeadline, string title)
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (hasHeadline && !string.IsNullOrWhiteSpace(title)) values[HeadlineKey] = title.Trim();
+        return new PostDocument(kind, version, JsonSerializer.SerializeToElement(values), JsonSerializer.SerializeToElement(new { }), []);
+    }
+
+    /// <summary>The string value of a root key, or null.</summary>
+    public string? RootText(string key) =>
+        Content.ValueKind == JsonValueKind.Object && Content.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
     public static PostDocument FromLegacy(string title, string body)
     {
         using var content = JsonDocument.Parse(JsonSerializer.Serialize(new { title, body }));

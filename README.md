@@ -159,6 +159,21 @@ field the tenant publishes. Its static URL prefix comes from that field.
   `GET /api/dynamicfields/catalog/root-post-fields`, with the caller's token and tenant. The list is cached per tenant
   for `Content:PostKindCacheSeconds` (default 60). A failure isn't cached.
 - **Creating a post.** Its kind must be in that list. Otherwise the answer is 400; if DynamicFields can't be reached, it's 503.
+- **The picker.** `GET /kinds` returns that list (`key`, `title`, `urlPrefix`, `schemaType`, `version`), or 503. The
+  new-post form offers it. It translates the starter library's titles and shows any other title as the tenant wrote it.
+  While the list can't be read, the form says so and offers the eight starter kinds.
+- **The new post's root.** Without a `document`, the post's root is its kind's field at its published `version`, with
+  the title as `headline` when the field has that value (read from `GET /api/dynamicfields/fields/{key}/versions/{n}`).
+  A later title change moves the headline with it while the two are still equal. The kind's other required values
+  (summary, image, ...) are still required: approve, schedule and publish refuse the post (422) until they're filled in.
+- **Setting the values.** `PUT /posts/{id}/root { version, fieldVersion, content, style? }` replaces the root's values
+  and style (whoever may edit the post now). The contents, title and body stay. The post page does this with
+  DynamicFields' `edit-content` dialog.
+- **Posts made before this** have the root `legacy.basic` (title and body), which is no DynamicFields field, so the
+  designer's check fails on them. Nothing converts them silently, and there's no migration (the field versions are each
+  tenant's). The post page marks such a post, and **Fill in the values** (the same `PUT .../root`) gives it its kind's
+  root. The title, body, contents and published snapshot stay, and a translated `title` becomes the translated
+  `headline`. The upgrade is refused if anything would be lost: another value in the old root, or a translated `body`.
 - **Publishing (decision D3).** A post whose kind has no published root field can still be edited. Publishing or
   scheduling it is refused with 409: "... has no published DynamicFields root post field, so it has no URL and cannot
   be published yet". A due scheduled post in that state stays scheduled, and a later run publishes it.
@@ -167,7 +182,8 @@ field the tenant publishes. Its static URL prefix comes from that field.
   public id.
   - `GET /posts/{id}` returns `urlPrefix` (the kind's prefix now, null while it has none) and `canonicalPath` (the
     live version's path).
-  - `GET /public/{publicId}` returns both without calling DynamicFields, so anonymous readers get them too.
+  - `GET /public/{publicId}` returns both without calling DynamicFields, so anonymous readers get them too. It also
+    returns the published `body`: a kind's root has no value for it.
   - Posts published before this release have no prefix until they're published again.
 - **Old kinds.** Until wave 4 the kind was an enum. The `PostKindsAsFieldKeys` migration maps its names to keys, in the
   kind columns and in the stored documents and contents:

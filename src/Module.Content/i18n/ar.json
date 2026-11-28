@@ -120,5 +120,15 @@
   "A post is in one primary category and any others of its press. Its unit is set by the workflow and is shown read-only.": "للمنشور تصنيف رئيسي واحد وأي تصنيفات أخرى من إصداره. وحدته يحددها سير العمل وتظهر للقراءة فقط.",
   "Primary category": "التصنيف الرئيسي",
   "Save categories": "حفظ التصنيفات",
-  "Categories saved.": "تم حفظ التصنيفات."
+  "Categories saved.": "تم حفظ التصنيفات.",
+  "Review": "مراجعة",
+  "Blog post": "تدوينة",
+  "The tenant's post kinds could not be read, so the standard ones are listed. Creating the post may fail until Dynamic Fields answers. ({0})": "تعذرت قراءة أنواع منشورات المؤسسة، لذا تظهر الأنواع القياسية. قد يفشل إنشاء المنشور إلى أن تستجيب وحدة الحقول الديناميكية. ({0})",
+  "No post kind is published yet: publish a root post field in Dynamic Fields first.": "لم يُنشر أي نوع منشورات بعد: انشر أولًا حقل منشور جذريًا في الحقول الديناميكية.",
+  "{0} values": "قيم {0}",
+  "This post was made from a title and a body only: it has none of its kind's values, so the designer's check fails on it. Fill them in to give it them; the title, the body and the contents stay as they are.": "أُنشئ هذا المنشور من عنوان ونص فقط، وليست له أي قيمة من قيم نوعه، لذا يفشل فيه فحص المصمم. أدخل القيم لإضافتها؛ ويبقى العنوان والنص والمحتويات كما هي.",
+  "The headline, summary, image and the other values of the post's kind. The post is checked against them when it is approved, scheduled or published.": "العنوان الرئيسي والملخص والصورة وبقية قيم نوع المنشور. يُفحص المنشور وفقها عند اعتماده أو جدولته أو نشره.",
+  "Fill in the values": "إدخال القيم",
+  "Edit values": "تعديل القيم",
+  "Editing the values needs the Dynamic Fields module (its edit-content dialog).": "يتطلب تعديل القيم وحدة الحقول الديناميكية (نافذة تعديل المحتوى)."
 }

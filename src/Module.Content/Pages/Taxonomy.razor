@@ -32,7 +32,7 @@
       <form class="ct-inline-form" @onsubmit="AddPressAsync" @onsubmit:preventDefault>
         <div class="mud-input-control ct-inline">
           <label class="mud-input-label" for="ct-press-id">@L["Id"]</label>
-          <div class="mud-input-wrapper"><input id="ct-press-id" class="mud-input-slot" @bind="_pressId" required pattern="[a-z0-9][a-z0-9-]*" placeholder="daily" /></div>
+          <div class="mud-input-wrapper"><input id="ct-press-id" class="mud-input-slot" @bind="_pressId" required pattern="[a-z0-9][a-z0-9\-]*" placeholder="daily" /></div>
         </div>
         <div class="mud-input-control ct-inline ct-grow">
           <label class="mud-input-label" for="ct-press-name">@L["Name"]</label>
@@ -72,7 +72,7 @@
         </div>
         <div class="mud-input-control ct-inline">
           <label class="mud-input-label" for="ct-cat-id">@L["Id"]</label>
-          <div class="mud-input-wrapper"><input id="ct-cat-id" class="mud-input-slot" @bind="_categoryId" required pattern="[a-z0-9][a-z0-9-]*" placeholder="local" /></div>
+          <div class="mud-input-wrapper"><input id="ct-cat-id" class="mud-input-slot" @bind="_categoryId" required pattern="[a-z0-9][a-z0-9\-]*" placeholder="local" /></div>
         </div>
         <div class="mud-input-control ct-inline ct-grow">
           <label class="mud-input-label" for="ct-cat-name">@L["English name"]</label>

@@ -63,7 +63,11 @@ public enum PostEditor { Owner, Reviewer, Desk }
 /// One edit of a post: any of its text, its document (root values plus the assembled contents), its contents, its slugs.
 /// </summary>
 public sealed record PostChange(string? Title = null, string? Body = null, PostDocument? Document = null,
-    IReadOnlyList<ContentRef>? Contents = null, IReadOnlyDictionary<string, string>? Slugs = null);
+    IReadOnlyList<ContentRef>? Contents = null, IReadOnlyDictionary<string, string>? Slugs = null)
+{
+    /// <summary>The translations to keep with this change, set by <see cref="Post.ChangeRoot"/> when it renames keys.</summary>
+    internal IReadOnlyList<PostTranslation>? Translations { get; init; }
+}
 
 /// <summary>One of a post's categories (the primary one included). Unique per post.</summary>
 public sealed class PostCategory : EntityBase<int>

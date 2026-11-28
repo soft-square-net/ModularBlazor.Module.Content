@@ -104,24 +104,37 @@ public abstract class ContentPageBase : ComponentBase
 
     protected static string When(DateTimeOffset? at) => at?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "";
 
-    /// <summary>
-    /// The post kinds a new post offers: the DynamicFields root post fields of the old enum (a tenant may publish more, and
-    /// the post form accepts any key).
-    /// </summary>
-    protected static readonly IReadOnlyList<string> KnownKinds =
-        ["post.article", "post.news", "post.video", "post.reportage", "post.photo-story", "post.other"];
+    /// <summary>The tenant's published post kinds (GET /api/content/kinds); null while they are not read, or could not be.</summary>
+    protected IReadOnlyList<PostKindInfo>? Kinds { get; private set; }
 
-    /// <summary>A post kind (a root field key) by name: "post.photo-story" → "Photo story", in the user's language; another key as it is.</summary>
-    protected string KindName(string? kind) => kind switch
+    /// <summary>Why the kinds could not be read, or null.</summary>
+    protected string? KindsError { get; private set; }
+
+    /// <summary>
+    /// Reads the tenant's kinds. A failure (DynamicFields unreachable, or refusing the caller) leaves the page working:
+    /// kinds are then named from the starter library, and the new post form offers those.
+    /// </summary>
+    protected async Task LoadKindsAsync()
     {
-        "post.article" => L["Article"],
-        "post.news" => L["News"],
-        "post.video" => L["Video"],
-        "post.reportage" => L["Reportage"],
-        "post.photo-story" => L["Photo story"],
-        "post.other" => L["Other"],
-        _ => kind ?? ""
-    };
+        try
+        {
+            Kinds = [.. await Content.ListPostKindsAsync()];
+            KindsError = null;
+        }
+        catch (AccessTokenNotAvailableException ex)
+        {
+            ex.Redirect();
+        }
+        catch (Exception ex)
+        {
+            Kinds = null;
+            KindsError = Describe(ex);
+        }
+    }
+
+    /// <summary>A post kind (a root field key) by name, in the UI language where the module knows it (see <see cref="ContentNames.Kind"/>).</summary>
+    protected string KindName(string? kind) =>
+        ContentNames.Kind(kind, Kinds?.FirstOrDefault(k => k.Key == kind)?.Title, text => L[text]);
 
     /// <summary>"InReview" → "In review", in the user's language (the key is the English words).</summary>
     protected string Words(Enum value) => L[EnglishWords(value)];

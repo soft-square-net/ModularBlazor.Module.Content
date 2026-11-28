@@ -205,11 +205,14 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
         }
         Change(actor, action, now, () =>
         {
+            var oldTitle = Title;
             if (edit.Title is not null) SetText(edit.Title, edit.Body ?? Body);
             else if (edit.Body is not null) Body = edit.Body;
             if (edit.Contents is not null) SetContents(edit.Contents);
             if (edit.Slugs is not null) SetSlugs(edit.Slugs);
+            if (edit.Translations is not null) TranslationsJson = JsonSerializer.Serialize(edit.Translations, PostJson.Options);
             if (edit.Document is not null) SetDocument(edit.Document);
+            else if (Title != oldTitle) FollowTitle(oldTitle);
             if (editor == PostEditor.Desk)
             {
                 ClearSchedule();
@@ -217,6 +220,64 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
             }
             _feed.Add((FeedEventTypes.PostChanged, null, action));
         });
+    }
+
+    /// <summary>
+    /// Replaces the root values and style of the document with those of <see cref="PostKind"/>'s field at
+    /// <paramref name="fieldVersion"/>, by whoever may edit the post now. The contents, the title and the body stay.
+    /// <para>This is also how a post made from a title and a body only (<see cref="PostDocument.LegacySchemaId"/>) gets a
+    /// root of its kind. Nothing of it may be lost: its text stays in <see cref="Title"/> and <see cref="Body"/>, its
+    /// translated title moves to the headline, and a root that holds anything else (or a translation with nowhere to go) is
+    /// refused.</para>
+    /// </summary>
+    public void ChangeRoot(PostEditor editor, string actor, int fieldVersion, JsonElement content, JsonElement style, DateTimeOffset now,
+        TimeSpan editWindow)
+    {
+        var current = Working;
+        var next = current with { SchemaId = PostKind, SchemaVersion = fieldVersion, Content = content, Style = style };
+        PostDocumentRules.Validate(next);
+        var translations = Translations;
+        string? body = null;
+        if (current.SchemaId == PostDocument.LegacySchemaId)
+        {
+            var other = current.Content.ValueKind == JsonValueKind.Object
+                ? current.Content.EnumerateObject().Select(p => p.Name).FirstOrDefault(n => n is not ("title" or "body"))
+                : null;
+            if (other is not null)
+                throw new DomainException($"This post's old root holds '{other}', which a '{PostKind}' root would drop; edit its whole document instead.");
+            if (string.IsNullOrWhiteSpace(Body) && current.RootText("body") is { } oldBody && !string.IsNullOrWhiteSpace(oldBody)) body = oldBody;
+            translations = translations.Select(TitleToHeadline).ToList();
+            foreach (var translation in translations)
+            {
+                if (!translation.Nodes.TryGetValue(PostTranslationRules.RootId, out var values)) continue;
+                var kept = PostTranslationRules.Prune(next, translation)?.Nodes.GetValueOrDefault(PostTranslationRules.RootId);
+                if (values.Keys.FirstOrDefault(k => kept?.ContainsKey(k) != true) is { } lost)
+                    throw new DomainException(
+                        $"The '{translation.Language}' translation of the old '{lost}' would be lost: remove that translation first (copy its text if you need it).");
+            }
+        }
+        Edit(editor, actor, now, editWindow, new PostChange(Body: body, Document: next) { Translations = translations });
+    }
+
+    private static PostTranslation TitleToHeadline(PostTranslation translation)
+    {
+        if (!translation.Nodes.TryGetValue(PostTranslationRules.RootId, out var root) || !root.TryGetValue("title", out var title)
+            || root.ContainsKey(PostDocument.HeadlineKey)) return translation;
+        var values = root.Where(v => v.Key != "title").ToDictionary(v => v.Key, v => v.Value, StringComparer.Ordinal);
+        values[PostDocument.HeadlineKey] = title;
+        var nodes = translation.Nodes.ToDictionary(n => n.Key, n => n.Value, StringComparer.Ordinal);
+        nodes[PostTranslationRules.RootId] = values;
+        return translation with { Nodes = nodes };
+    }
+
+    /// <summary>A headline that was the title follows a changed one; a headline set to something else stays as it is.</summary>
+    private void FollowTitle(string oldTitle)
+    {
+        var document = ReadDocument();
+        if (document.SchemaId == PostDocument.LegacySchemaId || document.RootText(PostDocument.HeadlineKey) != oldTitle) return;
+        var values = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(document.Content.GetRawText(), PostJson.Options)!;
+        values[PostDocument.HeadlineKey] = JsonSerializer.SerializeToElement(Title, PostJson.Options);
+        SetDocument(document with { Content = JsonSerializer.SerializeToElement(values) });
     }
 
     /// <summary>

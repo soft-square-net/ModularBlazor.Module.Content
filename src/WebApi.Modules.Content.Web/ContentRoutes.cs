@@ -25,6 +25,7 @@ public sealed class ContentRoutes : ICarterModule
         Presses.Add.Map(content);
         Categories.List.Map(content);
         Categories.Add.Map(content);
+        Posts.ListKinds.Map(content);
 
         MapPosts(content.MapGroup("/posts"), "posts", documented: true);
         // Compatibility routes: the same handlers, left out of the OpenAPI document so generated clients only use /posts.
@@ -76,6 +77,7 @@ public sealed class ContentRoutes : ICarterModule
         Post<Posts.SetSlugs>(posts, segment, documented);
         Post<Posts.SetCategories>(posts, segment, documented);
         Post<Posts.SetUnit>(posts, segment, documented);
+        Post<Posts.SetRoot>(posts, segment, documented);
         Post<Posts.Events>(posts, segment, documented);
     }
 
