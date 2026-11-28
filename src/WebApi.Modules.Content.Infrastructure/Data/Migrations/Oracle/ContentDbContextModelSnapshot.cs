@@ -448,7 +448,7 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasColumnType("NVARCHAR2(128)");
 
                     b.Property<string>("Body")
-                        .HasColumnType("NVARCHAR2(2000)");
+                        .HasColumnType("NCLOB");
 
                     b.Property<bool>("ContentsSplit")
                         .HasColumnType("BOOLEAN");
@@ -495,7 +495,7 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasColumnType("TIMESTAMP(7) WITH TIME ZONE");
 
                     b.Property<string>("PublishedBody")
-                        .HasColumnType("NVARCHAR2(2000)");
+                        .HasColumnType("NCLOB");
 
                     b.Property<string>("PublishedBy")
                         .HasMaxLength(128)
@@ -509,7 +509,7 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                         .HasColumnType("NVARCHAR2(300)");
 
                     b.Property<string>("PublishedTranslationsJson")
-                        .HasColumnType("NVARCHAR2(2000)");
+                        .HasColumnType("NCLOB");
 
                     b.Property<string>("PublishedUrlPrefix")
                         .HasMaxLength(200)
@@ -566,7 +566,7 @@ namespace soft.square.net.WebApi.Modules.Content.Infrastructure.Data.Migrations.
                     b.Property<string>("TranslationsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("NVARCHAR2(2000)")
+                        .HasColumnType("NCLOB")
                         .HasDefaultValue("[]");
 
                     b.Property<Guid?>("UnitId")

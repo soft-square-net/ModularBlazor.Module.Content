@@ -69,9 +69,14 @@ public sealed class ContentDbContext : TenantDbContext
 
         if (Database.ProviderName == "Oracle.EntityFrameworkCore")
         {
-            // Oracle maps an unbounded string to NVARCHAR2(2000); Post documents may be up to 2 MB.
+            // Oracle maps an unbounded string to NVARCHAR2(2000); Post documents may be up to 2 MB, and bodies and
+            // translations have no limit either. None of these is compared in a query (Oracle cannot compare an NCLOB).
             modelBuilder.Entity<Post>().Property(a => a.DocumentJson).HasColumnType("NCLOB");
             modelBuilder.Entity<Post>().Property(a => a.PublishedDocumentJson).HasColumnType("NCLOB");
+            modelBuilder.Entity<Post>().Property(a => a.Body).HasColumnType("NCLOB");
+            modelBuilder.Entity<Post>().Property(a => a.PublishedBody).HasColumnType("NCLOB");
+            modelBuilder.Entity<Post>().Property(a => a.TranslationsJson).HasColumnType("NCLOB");
+            modelBuilder.Entity<Post>().Property(a => a.PublishedTranslationsJson).HasColumnType("NCLOB");
             modelBuilder.Entity<ContentItem>().Property(c => c.ValuesJson).HasColumnType("NCLOB");
             modelBuilder.Entity<ContentRevision>().Property(r => r.ValuesJson).HasColumnType("NCLOB");
             modelBuilder.Entity<Pipeline>().Property(p => p.DefinitionJson).HasColumnType("NCLOB");
