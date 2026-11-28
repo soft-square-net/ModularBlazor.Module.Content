@@ -25,7 +25,8 @@ public sealed class ContentModule : IRuntimeModule
     {
         Description = "Newsroom posts (article, news, video, reportage, and other post kinds), taxonomy, review and publishing workflow.",
         DefaultSettings = new Dictionary<string, string?> { ["Content:OwnerEditWindow"] = "1.00:00:00", ["Content:EventDelay"] = "00:00:02",
-            ["Content:ApiBaseUrl"] = "http://localhost:5080", ["Content:PostKindCacheSeconds"] = "60", ["Content:UnitCacheSeconds"] = "60" },
+            ["Content:ApiBaseUrl"] = "http://localhost:5080", ["Content:PostKindCacheSeconds"] = "60", ["Content:UnitCacheSeconds"] = "60",
+            ["Content:Newsroom:WorkflowOwnsAssignment"] = "false" },
         Permissions = ContentPermissions.All,
         // content:post:{id}: a nudge for every new row of the post's feed (see PostLive).
         LiveTopics = [PostLive.Topic],

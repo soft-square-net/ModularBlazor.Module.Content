@@ -27,4 +27,18 @@ public sealed class ContentOptions
     /// <c>org.unit-*</c> event drops it at once.
     /// </summary>
     public int UnitCacheSeconds { get; set; } = 60;
+
+    /// <summary>The newsroom workflow's settings (section <c>Content:Newsroom</c>).</summary>
+    public NewsroomOptions Newsroom { get; set; } = new();
+}
+
+/// <summary>Section <c>Content:Newsroom</c>.</summary>
+public sealed class NewsroomOptions
+{
+    /// <summary>
+    /// Whether the newsroom workflow is the only one that assigns work. When true, a post's accept, assign, transfer and
+    /// return, and a content's assign, need <c>content.unit.assign</c> instead of the shift manager's (or the Desk's)
+    /// rights. Default false (the manual desk flow) until NewsRoom ships.
+    /// </summary>
+    public bool WorkflowOwnsAssignment { get; set; }
 }

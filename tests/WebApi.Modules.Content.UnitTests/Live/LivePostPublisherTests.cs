@@ -5,7 +5,9 @@ using soft.square.net.WebApi.Modules.Content.Core.CategoryAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 using soft.square.net.WebApi.Modules.Content.Core.PostAggregate;
 using soft.square.net.WebApi.Modules.Content.UnitTests.UseCases;
+using soft.square.net.WebApi.Modules.Content.UseCases;
 using soft.square.net.WebApi.Modules.Content.UseCases.Live;
+using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 using soft.square.net.WebApi.Modules.Content.Web;
 
 namespace soft.square.net.WebApi.Modules.Content.UnitTests.Live;
@@ -44,13 +46,27 @@ public sealed class LivePostPublisherTests
     }
 
     [Fact]
-    public void TheManifestDeclaresThePostTopic()
+    public void TheManifestDeclaresThePostTopicOnce()
     {
         var manifest = new ContentModule().Manifest;
 
-        manifest.LiveTopics.ShouldHaveSingleItem().ShouldBe(new LiveTopic("post", PostLive.Permission));
-        manifest.Permissions.Select(p => p.Name).ShouldContain(PostLive.Permission);
+        var topic = manifest.LiveTopics.ShouldHaveSingleItem();
+        topic.ShouldBeSameAs(PostLive.Topic);
+        topic.Kind.ShouldBe("post");
+        manifest.Permissions.Select(p => p.Name).ShouldContain(p => topic.Permissions.Contains(p));
+        topic.Permissions.ShouldBeSubsetOf(manifest.Permissions.Select(p => p.Name));
         PostLive.TopicOf(42).ShouldBe("content:post:42");
+    }
+
+    /// <summary>Any one of them is enough: the authors', and every permission that shows other people's posts.</summary>
+    [Fact]
+    public void ThePostTopicTakesTheAuthorRightOrAnySeeingRight()
+    {
+        PostLive.Topic.Permissions.ShouldBe([ContentPermissions.Author, .. PostAccess.SeeingPermissions]);
+        PostLive.Topic.Permissions.ShouldContain(ContentPermissions.Publish); // the Desk
+        PostLive.Topic.Permissions.ShouldContain(ContentPermissions.Return);  // the shift manager and the Desk
+        PostLive.Topic.Permissions.ShouldContain(ContentPermissions.Editor);
+        PostLive.Topic.Permissions.Distinct().Count().ShouldBe(PostLive.Topic.Permissions.Count);
     }
 
     [Fact]

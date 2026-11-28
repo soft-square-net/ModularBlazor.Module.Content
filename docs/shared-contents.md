@@ -20,7 +20,8 @@ with a URL, composed of shared contents that sections work on and the Desk revie
 
 Stages and actions are data (`GET /pipeline`, `PUT /pipeline` with `content.pipeline`). A user action is
 `POST /contents/{id}/act { action, version, note? }`: Content checks the stage it starts from, who may take it (`assignee`,
-`creator`, or a permission on the content's press/category) and the note it needs, without calling Elsa.
+`creator`, or a permission on the content's press/category) and the note it needs, without calling Elsa. Assigning a
+content (`POST /contents/{id}/assign`) is not a pipeline action; who may do it is in the README's "Who assigns work".
 
 The default (wave 4 C3: the stage keys are the work-item states, see the README's "Work items, checks and events"):
 

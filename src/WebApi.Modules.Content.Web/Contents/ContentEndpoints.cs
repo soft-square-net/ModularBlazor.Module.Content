@@ -87,7 +87,8 @@ public sealed class Assign : IEndpoint
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder app) =>
         app.MapPost("/contents/{id:guid}/assign", async (Guid id, ContentAssignment r, ISender sender, CancellationToken ct) =>
             (await sender.Send(new AssignContentCommand(id, r.Version, r.SectionId, r.AssigneeId), ct)).ToOkResult())
-            .RequirePermission(ContentPermissions.Assign)
+            // Either gets in; the use case asks for the one Content:Newsroom:WorkflowOwnsAssignment calls for.
+            .RequirePermission(ContentPermissions.Assign, ContentPermissions.UnitAssign)
             .WithName("Content_AssignContent");
 }
 

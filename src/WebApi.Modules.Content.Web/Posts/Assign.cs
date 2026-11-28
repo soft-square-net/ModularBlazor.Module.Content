@@ -10,7 +10,8 @@ public sealed class Assign : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/assign", HandleAsync)
-            .RequirePermission(ContentPermissions.Assign);
+            // Either gets in; the use case asks for the one Content:Newsroom:WorkflowOwnsAssignment calls for.
+            .RequirePermission(ContentPermissions.Assign, ContentPermissions.UnitAssign);
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, Assignment r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new AssignPostCommand(id, r.Version, r.AssigneeId, r.ShiftId), ct)).ToOkResult();

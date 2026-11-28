@@ -27,6 +27,7 @@ public static class ServiceConfigs
 
         // Shared by the Post use cases.
         services.AddScoped<PostAccess>();
+        services.AddScoped<AssignmentRights>(); // the manual desk flow, or the workflow only (Content:Newsroom)
         services.AddScoped<PostDetails>();
         services.AddScoped<PostChanges>();
         services.AddScoped<soft.square.net.WebApi.Modules.Content.UseCases.Posts.Translate.PostTranslators>();

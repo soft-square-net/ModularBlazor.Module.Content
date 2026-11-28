@@ -1,5 +1,7 @@
 # ModularBlazor.Module.Content
 
+[العربية](README.ar.md)
+
 Content: newsroom posts (article, news, video, reportage and other post kinds), taxonomy, and the review and publishing workflow. It is a module of the [ModularBlazor](https://github.com/soft-square-net/ModularBlazor.Platform) platform, released on its own as the bundle `content`.
 
 > **Status: moved in.** The code moved here from the platform repo and builds against the platform packages.
@@ -39,7 +41,10 @@ dotnet test
 
 The platform packages come from the soft-square-net GitHub Packages feed, which needs a token to restore even though
 the packages are public: create a personal access token (classic) with `read:packages` and put it in the environment
-as `GITHUB_PACKAGES_TOKEN` (`NuGet.Config` reads it). The platform version is pinned once, in `global.json`.
+as `GITHUB_PACKAGES_TOKEN` (`NuGet.Config` reads it). The platform version is pinned in `global.json` (the Module SDK),
+and the tests use the same one (`tests/Directory.Build.props`). It is **1.0.0-preview.8**, and the host must run
+preview.8 or later: the post live topic needs it (`LiveTopic.AnyOf`). A Platform checkout used for the playground or
+the scripts below must be at that tag or later.
 
 Tools that need the platform's source run from a checkout of
 [ModularBlazor.Platform](https://github.com/soft-square-net/ModularBlazor.Platform), pointed at this repo. Re-export the
@@ -221,6 +226,33 @@ field the tenant publishes. Its static URL prefix comes from that field.
 Content subscribes to `shifts.section-moved.v1` and `org.unit-*.v1` (the manifest's `Subscriptions`). The events it
 publishes are listed under "Work items, checks and events".
 
+## Who assigns work
+
+Moving work between people is five steps: a post's **accept**, **assign**, **transfer** and **return**, and a content's
+**assign** (`POST /contents/{id}/assign`). The setting `Content:Newsroom:WorkflowOwnsAssignment` (default **false**) says
+who may take them.
+
+| Step | `false` (default): the manual desk | `true`: the workflow only |
+| --- | --- | --- |
+| `POST /posts/{id}/accept` | `content.accept` in the named active shift | `content.unit.assign` |
+| `POST /posts/{id}/assign` | `content.assign` in the named active shift | `content.unit.assign` |
+| `POST /posts/{id}/transfer` | `content.transfer` | `content.unit.assign` |
+| `POST /posts/{id}/return` | `content.return` (shift Manager, Desk) | `content.unit.assign` |
+| `POST /contents/{id}/assign` | `content.assign` | `content.unit.assign` |
+
+- Every right is checked on the post's or the content's scopes (see "Categories and units").
+- With `true`, `content.unit.assign` **replaces** the right of the left column: ordinary users get 403, the shift manager
+  and the Desk too, and the workflow's service client needs no shift.
+- The other rules don't change. Accept still records a shift id, assign still names a shift on which the assignee holds
+  `content.review` for the post (otherwise 409), and each step still needs the post in a state it can start from.
+- Keep it `false` until the NewsRoom workflow runs: with `true` and no workflow, nobody can assign work. The pages
+  still show the buttons; the API decides.
+- It does not change these:
+  - `POST /automation/auto-assign/{id}` still needs `content.assign` and then takes the assign step, so with `true` its
+    caller needs `content.unit.assign` too.
+  - `POST /automation/handover` keeps its own rule, tenant-wide `content.transfer`.
+  - `POST /contents` may still name a first assignee, with the author right.
+
 ## Work items, checks and events
 
 **A content is a work item; its stage is the state.** Each content of the library is the platform work item
@@ -341,9 +373,14 @@ dotnet test tests/WebApi.Modules.Content.MigrationTests
 
 **Live topic `content:post:{id}`** (`UseCases/Live/PostLive.cs`):
 
-- **Manifest:** `LiveTopics = [new LiveTopic("post", "content.author")]`.
-  - Content has no single "read a post" permission, so the topic uses the authors' permission. Authors are the studio's users.
-  - The hub checks it on `post:{id}`, and on the post's `press:`, `category:` (every category) and `unit:` (its unit and the unit's ancestors) scopes from `PostLiveScopeResolver` (an `ILiveScopeResolver` in the module's services).
+- **Manifest:** one declaration, `LiveTopic.AnyOf("post", content.author + PostAccess.SeeingPermissions)`. Any one of
+  these is enough: `content.author`, `content.accept`, `content.assign`, `content.return`, `content.publish`,
+  `content.editor`, `content.manage`, `content.unit.assign`.
+  - Content has no single "read a post" permission, so the topic lists the authors' (the studio's users) and every one
+    that shows other people's posts. So the shift manager and the Desk get live updates without the author right.
+  - `content.review` is not in the list: a reviewer who holds none of these polls.
+  - The platform refuses a manifest that declares a kind twice.
+  - The hub checks them on `post:{id}`, and on the post's `press:`, `category:` (every category) and `unit:` (its unit and the unit's ancestors) scopes from `PostLiveScopeResolver` (an `ILiveScopeResolver` in the module's services).
   - The resolver runs only where Content is loaded on the hub's pool (core).
   - A caller without the right is refused, and the ContentDesigner studio then polls the feed.
 - **Messages:** once the feed rows (`FeedEntry`) of a save are committed, `LivePostPublisher` publishes `post.changed` with `{ eventId, type, contentId? }` and `sequence: null`.

@@ -10,7 +10,8 @@ public sealed class Return : IPostEndpoint
 
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder posts, string resourceSegment) =>
         posts.MapPost("/{id:int}/return", HandleAsync)
-            .RequirePermission(ContentPermissions.Return);
+            // Either gets in; the use case asks for the one Content:Newsroom:WorkflowOwnsAssignment calls for.
+            .RequirePermission(ContentPermissions.Return, ContentPermissions.UnitAssign);
 
     private static async Task<Results<Ok<PostDetail>, ProblemHttpResult>> HandleAsync(int id, ReturnRequest r, ISender sender, CancellationToken ct) =>
         (await sender.Send(new ReturnPostCommand(id, r.Version, r.Reason), ct)).ToOkResult();

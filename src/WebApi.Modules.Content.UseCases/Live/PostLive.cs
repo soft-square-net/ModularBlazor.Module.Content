@@ -6,14 +6,15 @@ using Microsoft.Extensions.Logging;
 using soft.square.net.WebApi.Contracts.Live;
 using soft.square.net.WebApi.Modules.Content.Core.FeedAggregate;
 using soft.square.net.WebApi.Modules.Content.UseCases.Contents;
+using soft.square.net.WebApi.Modules.Content.UseCases.Posts;
 
 namespace soft.square.net.WebApi.Modules.Content.UseCases.Live;
 
 /// <summary>
 /// The module's live topic: <c>content:post:{id}</c>. A subscriber gets a small nudge whenever the post's feed
 /// (<c>GET /posts/{id}/events</c>) has a new row, then re-reads the feed. Declared in the manifest as
-/// <see cref="Topic"/>; the hub checks <see cref="Permission"/> on <c>post:{id}</c> and on the post's press, categories and unit
-/// (from <see cref="PostLiveScopeResolver"/>).
+/// <see cref="Topic"/>; the hub lets in a holder of any of <see cref="Permissions"/> on <c>post:{id}</c> or on the post's
+/// press, categories or unit (from <see cref="PostLiveScopeResolver"/>).
 /// </summary>
 public static class PostLive
 {
@@ -23,13 +24,15 @@ public static class PostLive
     public const string MessageType = ContentLiveTopic.MessageType;
 
     /// <summary>
-    /// Who may subscribe. Content has no single "read a post" permission (a post is seen by its owner, its reviewer and the
-    /// holders of <see cref="PostAccess.SeeingPermissions"/>), and a live topic takes one: the authors', the studio's users.
-    /// Others still get the changes by reading the feed (the studio falls back to polling when the hub refuses the topic).
+    /// Who may subscribe: a holder of any one of these. Content has no single "read a post" permission, so they are the
+    /// authors' (the studio's users) and every one that shows posts the caller neither owns nor works on
+    /// (<see cref="PostAccess.SeeingPermissions"/>: the shift manager, the Desk, standing editors, admins, the workflow).
+    /// Others still get the changes by reading the feed (the studio polls when the hub refuses the topic).
     /// </summary>
-    public const string Permission = ContentPermissions.Author;
+    public static IReadOnlyList<string> Permissions { get; } = [ContentPermissions.Author, .. PostAccess.SeeingPermissions];
 
-    public static LiveTopic Topic { get; } = new(Kind, Permission);
+    /// <summary>The kind's one declaration (the platform refuses a manifest that declares a kind twice).</summary>
+    public static LiveTopic Topic { get; } = LiveTopic.AnyOf(Kind, Permissions);
 
     public static string TopicOf(int postId) => LiveTopics.Of(ModuleId, Kind, postId.ToString(System.Globalization.CultureInfo.InvariantCulture));
 }
