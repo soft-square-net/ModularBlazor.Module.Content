@@ -24,6 +24,7 @@ namespace soft.square.net.WebApi.Modules.Content.MigrationTests;
 /// <item>its model snapshot matches the model (no pending model changes; no database needed);</item>
 /// <item>every migration applies to an empty database, in order;</item>
 /// <item>a post with an empty body saves and reads back with an empty body (Oracle stores '' as NULL);</item>
+/// <item>a post with a body longer than 2000 characters saves and reads back whole (Oracle's NVARCHAR2 limit);</item>
 /// <item>the data step of <c>PostKindsAsFieldKeys</c> works both ways: down to the enum names, up to the field keys,
 /// in the kind columns and in the stored JSON;</item>
 /// <item>the data step of <c>UnitsAndCategories</c>: posts and contents keep their unit, a post its categories; down and
@@ -209,6 +210,17 @@ public abstract class MigrationHarness
             var content = await context.Contents.AsNoTracking().SingleAsync(Ct);
             content.Node.PostKind.ShouldBe(PostKinds.PhotoStory);
         }
+
+        // 5b. A long body (more than Oracle's 2000-character NVARCHAR2) saves and reads back whole; it stays for step 6.
+        var longBody = string.Concat(Enumerable.Repeat("نص طويل ", 625)); // 5000 characters
+        await using (var context = Context(connection))
+        {
+            var politics = await context.Categories.SingleAsync(c => c.Id == "politics", Ct);
+            context.Add(Post.Create("owner-1", politics, "A long one", longBody, Now));
+            await context.SaveChangesAsync(Ct);
+        }
+        await using (var context = Context(connection))
+            (await context.Posts.AsNoTracking().SingleAsync(p => p.Title == "A long one", Ct)).Body.ShouldBe(longBody);
 
         // 6. Every Down, then every Up again.
         await using (var context = Context(connection))
