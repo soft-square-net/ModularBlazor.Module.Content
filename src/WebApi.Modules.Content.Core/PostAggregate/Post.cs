@@ -24,6 +24,7 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     private readonly List<PostSlug> _slugs = [];
     private readonly List<PostCategory> _categories = [];
     private readonly List<(string Type, Guid? ContentId, string? Detail)> _feed = [];
+    private string? _body = ""; // EF Core reads the column into it (see Body)
 
     private Post() { } // EF Core
 
@@ -35,7 +36,8 @@ public sealed class Post : AggregateRoot<int>, ITenantOwned
     /// <summary>The primary category (stored in the column <c>CategoryId</c>); always one of <see cref="Categories"/>.</summary>
     public string PrimaryCategoryId { get; private set; } = "";
     public string Title { get; private set; } = "";
-    public string Body { get; private set; } = "";
+    /// <summary>The plain body; empty for a document-only post (Oracle stores that as NULL, read back here as "").</summary>
+    public string Body { get => _body ?? ""; private set => _body = value; }
     /// <summary>Authoring document; schema ID/version are retained so edits can use the original field contract.</summary>
     public string SchemaId { get; private set; } = "legacy.basic";
     public int SchemaVersion { get; private set; } = 1;

@@ -22,7 +22,9 @@ public sealed class GetPublishedPostHandler(IReadRepository<Post> reader) : IQue
             : await reader.FirstOrDefaultAsync(new PublishedPostByPublicIdSpec(publicId), ct);
         if (post?.PublishedAt is not { } publishedAt) return Result<PublishedPost>.NotFound("Published Post was not found.");
 
-        var document = PostDetails.ReadDocument(post.PublishedDocumentJson, post.PublishedTitle ?? post.Title, post.PublishedBody ?? post.Body,
+        // A published post always has its title snapshot; with it, a NULL body is an empty one (Oracle stores '' as NULL).
+        var publishedBody = post.PublishedBody ?? (post.PublishedTitle is null ? post.Body : "");
+        var document = PostDetails.ReadDocument(post.PublishedDocumentJson, post.PublishedTitle ?? post.Title, publishedBody,
             "The published Post document is invalid.");
         var translations = post.PublishedTranslations;
         var served = PostTranslationRules.Chain(query.Culture, translations.Select(t => t.Language));
